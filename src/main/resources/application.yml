@@ -1,0 +1,47 @@
+server:
+  port: 18888
+  servlet:
+    context-path: /api
+spring:
+  application:
+    name: lg-picture-backend
+  # 数据库配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://117.72.83.137:3306/leo-springboot-tutorial?useUnicode=true&useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: gzm2001..
+
+
+#mybatis-plus配置
+mybatis-plus:
+  #配置Mapper映射文件
+  mapper-locations: classpath:/mapper/*.xml
+  # 配置Mybatis数据返回类型别名（默认别名为类名）
+  type-aliases-package: org.leocoder.picture.domain
+  configuration:
+    # 自动驼峰命名
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: isDeleted # 全局逻辑删除的实体字段名(since 3.3.0,配置后可以忽略不配置步骤2)
+      logic-delete-value: 1 # 逻辑已删除值(默认为 1)
+      logic-not-delete-value: 0 # 逻辑未删除值(默认为 0)
+
+
+#配置控制台打印日志Debug
+logging:
+  level:
+    org.leocoder.picture.mapper: debug
+
+# 接口文档配置
+knife4j:
+  enable: true
+  openapi:
+    title: "接口文档"
+    version: 1.0
+    group:
+      default:
+        api-rule: package
+        api-rule-resources:
+          - com.yupi.yupicturebackend.controller
