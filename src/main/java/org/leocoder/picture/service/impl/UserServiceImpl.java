@@ -1,12 +1,16 @@
 package org.leocoder.picture.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.leocoder.picture.domain.User;
+import org.leocoder.picture.domain.dto.user.UserQueryRequest;
 import org.leocoder.picture.domain.vo.user.LoginUserVO;
+import org.leocoder.picture.domain.vo.user.UserVO;
 import org.leocoder.picture.enums.UserRoleEnum;
 import org.leocoder.picture.exception.BusinessException;
 import org.leocoder.picture.exception.ErrorCode;
@@ -19,6 +23,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.leocoder.picture.constant.UserConstant.USER_LOGIN_STATE;
 
@@ -164,6 +171,64 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 移除登录态
         request.getSession().removeAttribute(USER_LOGIN_STATE);
         return true;
+    }
+
+    /**
+     * 获取用户信息
+     *
+     * @param user 用户对象
+     * @return 用户信息
+     */
+    @Override
+    public UserVO getUserVO(User user) {
+        if (ObjectUtil.isNull(user)) {
+            return null;
+        }
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+        return userVO;
+    }
+
+    /**
+     * 获取用户信息列表
+     *
+     * @param userList 用户列表
+     * @return 用户信息列表
+     */
+    @Override
+    public List<UserVO> getUserVOList(List<User> userList) {
+        if (CollUtil.isEmpty(userList)) {
+            return new ArrayList<>();
+        }
+        return userList.stream().map(this::getUserVO).collect(Collectors.toList());
+    }
+
+    /**
+     * 获取用户分页信息
+     *
+     * @param userQueryRequest 用户查询请求
+     * @return 用户分页信息
+     */
+    @Override
+    public LambdaQueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest) {
+        if (ObjectUtil.isNull(userQueryRequest)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
+        }
+        Long id = userQueryRequest.getId();
+        String userAccount = userQueryRequest.getUserAccount();
+        String userName = userQueryRequest.getUserName();
+        String userProfile = userQueryRequest.getUserProfile();
+        String userRole = userQueryRequest.getUserRole();
+        String sortField = userQueryRequest.getSortField();
+        String sortOrder = userQueryRequest.getSortOrder();
+        LambdaQueryWrapper<User> lambdaQueryWrapper = Wrappers.lambdaQuery(User.class);
+        lambdaQueryWrapper.eq(ObjUtil.isNotNull(id), User::getId, id);
+        lambdaQueryWrapper.eq(ObjUtil.isNotNull(userRole), User::getUserRole, userRole);
+        lambdaQueryWrapper.like(ObjUtil.isNotNull(userAccount), User::getUserAccount, userAccount);
+        lambdaQueryWrapper.like(ObjUtil.isNotNull(userName), User::getUserName, userName);
+        lambdaQueryWrapper.like(ObjUtil.isNotNull(userProfile), User::getUserProfile, userProfile);
+        lambdaQueryWrapper.orderBy(ObjUtil.isNotNull(sortField), sortOrder.equals("ascend"), User::getId);
+        return lambdaQueryWrapper;
     }
 
 

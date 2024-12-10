@@ -8,14 +8,14 @@ import java.time.LocalDateTime;
 /**
  * @author : 程序员Leo
  * @version 1.0
- * @date 2024-12-10 22:37
- * @description : 脱敏后登录用户信息
+ * @date 2024-12-10 23:17
+ * @description : 脱敏后的用户
  */
 @Data
-public class LoginUserVO implements Serializable {
+public class UserVO implements Serializable {
 
     /**
-     * 用户 id
+     * id
      */
     private Long id;
 
@@ -48,11 +48,6 @@ public class LoginUserVO implements Serializable {
      * 创建时间
      */
     private LocalDateTime createTime;
-
-    /**
-     * 更新时间
-     */
-    private LocalDateTime updateTime;
 
     private static final long serialVersionUID = 1L;
 }

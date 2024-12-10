@@ -1,10 +1,14 @@
 package org.leocoder.picture.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.leocoder.picture.domain.User;
+import org.leocoder.picture.domain.dto.user.UserQueryRequest;
 import org.leocoder.picture.domain.vo.user.LoginUserVO;
+import org.leocoder.picture.domain.vo.user.UserVO;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * @author : 程序员Leo
@@ -26,6 +30,30 @@ public interface UserService extends IService<User> {
      */
     Long userRegister(String userAccount, String userPassword, String checkPassword);
 
+
+    /**
+     * 获取用户信息
+     *
+     * @param user 用户对象
+     * @return 用户信息
+     */
+    UserVO getUserVO(User user);
+
+    /**
+     * 获取用户信息列表
+     *
+     * @param userList 用户列表
+     * @return 用户信息列表
+     */
+    List<UserVO> getUserVOList(List<User> userList);
+
+    /**
+     * 获取用户分页信息
+     *
+     * @param userQueryRequest 用户查询请求
+     * @return 用户分页信息
+     */
+    LambdaQueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
 
     /**
      * 加密密码

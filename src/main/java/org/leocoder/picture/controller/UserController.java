@@ -26,7 +26,7 @@ import javax.servlet.http.HttpServletRequest;
 @RestController
 @RequestMapping("/user")
 @RequiredArgsConstructor
-@Api(tags = "用户管理")
+@Api(tags = "登录管理")
 public class UserController {
 
     private final UserService userService;
