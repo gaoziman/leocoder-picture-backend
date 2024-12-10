@@ -6,14 +6,21 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.leocoder.picture.domain.User;
+import org.leocoder.picture.domain.vo.user.LoginUserVO;
 import org.leocoder.picture.enums.UserRoleEnum;
 import org.leocoder.picture.exception.BusinessException;
 import org.leocoder.picture.exception.ErrorCode;
+import org.leocoder.picture.exception.ThrowUtils;
 import org.leocoder.picture.mapper.UserMapper;
 import org.leocoder.picture.service.UserService;
 import org.leocoder.picture.utils.PasswordUtil;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+
+import javax.servlet.http.HttpServletRequest;
+
+import static org.leocoder.picture.constant.UserConstant.USER_LOGIN_STATE;
 
 /**
  * @author : 程序员Leo
@@ -50,8 +57,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
 
         // 2. 检验用户是否存在
-        LambdaQueryWrapper<User> lambdaQueryWrapper = Wrappers.lambdaQuery(User.class)
-                .eq(User::getUserAccount, userAccount);
+        LambdaQueryWrapper<User> lambdaQueryWrapper = Wrappers.lambdaQuery(User.class).eq(User::getUserAccount, userAccount);
         User existingUser = this.getOne(lambdaQueryWrapper);
         if (ObjectUtil.isNotNull(existingUser)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户已存在");
@@ -62,12 +68,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
 
         // 4.保存用户信息
-        User user = User.builder()
-                .userAccount(userAccount)
-                .userPassword(encryptedPassword)
-                .userRole(UserRoleEnum.USER.getValue())
-                .userName("无名用户")
-                .build();
+        User user = User.builder().userAccount(userAccount).userPassword(encryptedPassword).userRole(UserRoleEnum.USER.getValue()).userName("无名用户").build();
 
         boolean saveResult = this.save(user);
         if (!saveResult) {
@@ -76,6 +77,95 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         return user.getId();
     }
+
+
+    /**
+     * 用户登录
+     *
+     * @param userAccount  用户账户
+     * @param userPassword 用户密码
+     * @param request      请求对象
+     * @return 脱敏后的用户信息
+     */
+    @Override
+    public LoginUserVO userLogin(String userAccount, String userPassword, HttpServletRequest request) {
+        // 1. 校验参数
+        ThrowUtils.throwIf(StrUtil.hasBlank(userAccount, userPassword), ErrorCode.PARAMS_ERROR, "参数为空");
+        ThrowUtils.throwIf(userAccount.length() < 4, ErrorCode.PARAMS_ERROR, "账号不能小于4位");
+        ThrowUtils.throwIf(userPassword.length() < 8, ErrorCode.PARAMS_ERROR, "密码不能小于8位");
+
+        // 2. 加密
+        String encryptPassword = encryptPassword(userPassword);
+
+        // 查询用户是否存在
+        LambdaQueryWrapper<User> lambdaQueryWrapper = Wrappers.lambdaQuery(User.class).eq(User::getUserAccount, userAccount).eq(User::getUserPassword, encryptPassword);
+        User user = this.getOne(lambdaQueryWrapper);
+
+        // 用户不存在
+        ThrowUtils.throwIf(ObjectUtil.isNull(user), ErrorCode.BUSINESS_ERROR, "用户不存在或密码错误");
+
+
+        // 3. 记录用户的登录态
+        request.getSession().setAttribute(USER_LOGIN_STATE, user);
+        return this.getLoginUserVO(user);
+    }
+
+
+    /**
+     * 获取已登录用户信息
+     *
+     * @param request 请求对象
+     * @return 已登录用户信息
+     */
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        // 先判断是否已登录
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        User currentUser = (User) userObj;
+        if (ObjectUtil.isNull(currentUser) || currentUser.getId() == null) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        // 从数据库查询（追求性能的话可以注释，直接返回上述结果）
+        currentUser = this.getById(currentUser.getId());
+        if (ObjectUtil.isNull(currentUser)) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+        }
+        return currentUser;
+    }
+
+    /**
+     * 获取脱敏的已登录用户信息
+     *
+     * @return 脱敏后的用户信息
+     */
+    @Override
+    public LoginUserVO getLoginUserVO(User user) {
+        if (ObjectUtil.isNull(user)) {
+            return null;
+        }
+        LoginUserVO loginUserVO = new LoginUserVO();
+        BeanUtils.copyProperties(user, loginUserVO);
+        return loginUserVO;
+    }
+
+    /**
+     * 用户注销
+     *
+     * @param request 请求对象
+     * @return true：注销成功，false：注销失败
+     */
+    @Override
+    public boolean userLogout(HttpServletRequest request) {
+        // 先判断是否已登录
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        if (ObjectUtil.isNull(userObj)) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "未登录");
+        }
+        // 移除登录态
+        request.getSession().removeAttribute(USER_LOGIN_STATE);
+        return true;
+    }
+
 
     /**
      * 对密码进行加盐加密
