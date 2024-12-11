@@ -28,7 +28,7 @@ public interface UserConstant {
     /**
      * 默认密码
      */
-    String USER_DEFAULT_PASSWORD = "123456";
+    String USER_DEFAULT_PASSWORD = "12345678";
     // endregion
 }
 
