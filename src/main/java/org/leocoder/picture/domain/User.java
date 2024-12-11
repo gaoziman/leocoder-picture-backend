@@ -85,7 +85,8 @@ public class User implements Serializable {
      * 是否删除
      */
     @TableField(value = "is_delete")
-    private Byte isDelete;
+    @TableLogic
+    private Integer isDelete;
 
     private static final long serialVersionUID = 1L;
 }

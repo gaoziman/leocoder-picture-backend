@@ -1,6 +1,7 @@
 package org.leocoder.picture.controller;
 
 import cn.hutool.core.util.ObjectUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -24,6 +25,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static org.leocoder.picture.constant.UserConstant.USER_DEFAULT_PASSWORD;
+
 /**
  * @author : 程序员Leo
  * @version 1.0
@@ -44,11 +47,13 @@ public class AdminUserController {
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public Result<Long> addUser(@RequestBody UserAddRequest userAddRequest) {
         ThrowUtils.throwIf(ObjectUtil.isNull(userAddRequest), ErrorCode.PARAMS_ERROR);
-        User user = new User();
+        String userAccount = userAddRequest.getUserAccount();
+        User one = userService.getOne(new LambdaQueryWrapper<>(User.class)
+                .eq(User::getUserAccount, userAccount));
+        ThrowUtils.throwIf(ObjectUtil.isNotNull(one), ErrorCode.BUSINESS_ERROR,"用户账号已经存在");
+        User user = User.builder().build();
         BeanUtils.copyProperties(userAddRequest, user);
-        // 默认密码 123456
-        final String DEFAULT_PASSWORD = "123456";
-        String encryptPassword = userService.encryptPassword(DEFAULT_PASSWORD);
+        String encryptPassword = userService.encryptPassword(USER_DEFAULT_PASSWORD);
         user.setUserPassword(encryptPassword);
         boolean result = userService.save(user);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
@@ -67,7 +72,7 @@ public class AdminUserController {
     }
 
 
-    @ApiOperation(value = "根据 id 获取包装类")
+    @ApiOperation(value = "根据id获取脱敏用户信息")
     @GetMapping("/get/vo")
     public Result<UserVO> getUserVOById(Long id) {
         ThrowUtils.throwIf(id == null || id <= 0, ErrorCode.PARAMS_ERROR);
@@ -81,11 +86,13 @@ public class AdminUserController {
     @PostMapping("/delete")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public Result<Boolean> deleteUser(@RequestBody DeleteRequest deleteRequest) {
+        // 参数校验
         if (ObjectUtil.isNull(deleteRequest) || deleteRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        boolean b = userService.removeById(deleteRequest.getId());
-        return ResultUtils.success(b);
+
+        boolean result = userService.removeById(deleteRequest.getId());
+        return ResultUtils.success(result);
     }
 
     @ApiOperation(value = "更新用户")
@@ -95,7 +102,7 @@ public class AdminUserController {
         if (ObjectUtil.isNull(userUpdateRequest) || userUpdateRequest.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        User user = new User();
+        User user = User.builder().build();
         BeanUtils.copyProperties(userUpdateRequest, user);
         boolean result = userService.updateById(user);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
