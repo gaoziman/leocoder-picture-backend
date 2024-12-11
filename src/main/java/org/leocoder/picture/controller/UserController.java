@@ -21,7 +21,7 @@ import javax.servlet.http.HttpServletRequest;
  * @author : 程序员Leo
  * @version 1.0
  * @date 2024-12-10 21:05
- * @description :
+ * @description : 用户相关接口
  */
 @RestController
 @RequestMapping("/user")
@@ -68,6 +68,4 @@ public class UserController {
         boolean result = userService.userLogout(request);
         return ResultUtils.success(result);
     }
-
-
 }

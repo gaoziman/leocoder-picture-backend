@@ -227,7 +227,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         lambdaQueryWrapper.like(ObjUtil.isNotNull(userAccount), User::getUserAccount, userAccount);
         lambdaQueryWrapper.like(ObjUtil.isNotNull(userName), User::getUserName, userName);
         lambdaQueryWrapper.like(ObjUtil.isNotNull(userProfile), User::getUserProfile, userProfile);
-        lambdaQueryWrapper.orderBy(ObjUtil.isNotNull(sortField), sortOrder.equals("ascend"), User::getId);
+        lambdaQueryWrapper.orderBy(ObjUtil.isNotNull(sortField), "ascend".equals(sortOrder), User::getId);
         return lambdaQueryWrapper;
     }
 

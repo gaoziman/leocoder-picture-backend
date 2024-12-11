@@ -28,7 +28,7 @@ import java.util.List;
  * @author : 程序员Leo
  * @version 1.0
  * @date 2024-12-10 23:29
- * @description :
+ * @description ： 管理员管理用户
  */
 @RestController
 @RequestMapping("/user")
@@ -117,5 +117,4 @@ public class AdminUserController {
         userVOPage.setRecords(userVOList);
         return ResultUtils.success(userVOPage);
     }
-
 }
