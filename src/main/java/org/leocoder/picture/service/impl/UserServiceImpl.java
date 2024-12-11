@@ -67,7 +67,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         LambdaQueryWrapper<User> lambdaQueryWrapper = Wrappers.lambdaQuery(User.class).eq(User::getUserAccount, userAccount);
         User existingUser = this.getOne(lambdaQueryWrapper);
         if (ObjectUtil.isNotNull(existingUser)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户已存在");
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "用户已存在");
         }
 
         // 3. 密码加密
@@ -166,7 +166,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 先判断是否已登录
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
         if (ObjectUtil.isNull(userObj)) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "未登录");
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
         }
         // 移除登录态
         request.getSession().removeAttribute(USER_LOGIN_STATE);
@@ -227,7 +227,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         lambdaQueryWrapper.like(ObjUtil.isNotNull(userAccount), User::getUserAccount, userAccount);
         lambdaQueryWrapper.like(ObjUtil.isNotNull(userName), User::getUserName, userName);
         lambdaQueryWrapper.like(ObjUtil.isNotNull(userProfile), User::getUserProfile, userProfile);
-        lambdaQueryWrapper.orderBy(ObjUtil.isNotNull(sortField), sortOrder.equals("ascend"), User::getId);
+        lambdaQueryWrapper.orderBy(ObjUtil.isNotNull(sortField), "ascend".equals(sortOrder), User::getId);
         return lambdaQueryWrapper;
     }
 
