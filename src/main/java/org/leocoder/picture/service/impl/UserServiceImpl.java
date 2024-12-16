@@ -174,6 +174,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     /**
+     * 判断是否为管理员
+     *
+     * @param user 用户对象
+     * @return true：是管理员，false：不是管理员
+     */
+    @Override
+    public boolean isAdmin(User user) {
+        return ObjectUtil.isNotNull(user) && UserRoleEnum.ADMIN.getValue().equals(user.getUserRole());
+    }
+
+    /**
      * 获取用户信息
      *
      * @param user 用户对象
