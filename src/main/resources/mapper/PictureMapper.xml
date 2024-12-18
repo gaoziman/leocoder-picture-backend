@@ -1,29 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.leocoder.picture.mapper.PictureMapper">
-  <resultMap id="BaseResultMap" type="org.leocoder.picture.domain.Picture">
-    <!--@mbg.generated-->
-    <!--@Table picture-->
-    <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="url" jdbcType="VARCHAR" property="url" />
-    <result column="name" jdbcType="VARCHAR" property="name" />
-    <result column="introduction" jdbcType="VARCHAR" property="introduction" />
-    <result column="category" jdbcType="VARCHAR" property="category" />
-    <result column="tags" jdbcType="VARCHAR" property="tags" />
-    <result column="pic_size" jdbcType="BIGINT" property="picSize" />
-    <result column="pic_width" jdbcType="INTEGER" property="picWidth" />
-    <result column="pic_height" jdbcType="INTEGER" property="picHeight" />
-    <result column="pic_scale" jdbcType="DOUBLE" property="picScale" />
-    <result column="pic_format" jdbcType="VARCHAR" property="picFormat" />
-    <result column="user_id" jdbcType="BIGINT" property="userId" />
-    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
-    <result column="edit_time" jdbcType="TIMESTAMP" property="editTime" />
-    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
-    <result column="is_delete" jdbcType="TINYINT" property="isDelete" />
-  </resultMap>
-  <sql id="Base_Column_List">
-    <!--@mbg.generated-->
-    id, url, `name`, introduction, category, tags, pic_size, pic_width, pic_height, pic_scale, 
-    pic_format, user_id, create_time, edit_time, update_time, is_delete
-  </sql>
+    <resultMap id="BaseResultMap" type="org.leocoder.picture.domain.Picture">
+        <!--@mbg.generated-->
+        <!--@Table picture-->
+        <id column="id" jdbcType="BIGINT" property="id"/>
+        <result column="url" jdbcType="VARCHAR" property="url"/>
+        <result column="name" jdbcType="VARCHAR" property="name"/>
+        <result column="introduction" jdbcType="VARCHAR" property="introduction"/>
+        <result column="category" jdbcType="VARCHAR" property="category"/>
+        <result column="tags" jdbcType="VARCHAR" property="tags"/>
+        <result column="pic_size" jdbcType="BIGINT" property="picSize"/>
+        <result column="pic_width" jdbcType="INTEGER" property="picWidth"/>
+        <result column="pic_height" jdbcType="INTEGER" property="picHeight"/>
+        <result column="pic_scale" jdbcType="DOUBLE" property="picScale"/>
+        <result column="pic_format" jdbcType="VARCHAR" property="picFormat"/>
+        <result column="reviewer_id" jdbcType="BIGINT" property="reviewerId"/>
+        <result column="review_status" jdbcType="BIGINT" property="reviewStatus"/>
+        <result column="review_message" jdbcType="VARCHAR" property="reviewMessage"/>
+        <result column="review_time" jdbcType="TIMESTAMP" property="reviewTime"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="edit_time" jdbcType="TIMESTAMP" property="editTime"/>
+        <result column="update_time" jdbcType="TIMESTAMP" property="updateTime"/>
+        <result column="is_delete" jdbcType="TINYINT" property="isDelete"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        <!--@mbg.generated-->
+        id,
+        url,
+        `name`,
+        introduction,
+        category,
+        tags,
+        pic_size,
+        pic_width,
+        pic_height,
+        pic_scale,
+        pic_format,
+        user_id,
+        reviewer_id,
+        review_status,
+        review_message,
+        review_time,
+        create_time,
+        edit_time,
+        update_time,
+        is_delete
+    </sql>
 </mapper>
