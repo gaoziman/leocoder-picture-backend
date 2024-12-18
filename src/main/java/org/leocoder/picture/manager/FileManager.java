@@ -36,17 +36,17 @@ import java.util.List;
  * @version 1.0
  * @date 2024-12-12 23:16
  * @description : FileManager
+ * @deprecated 已废弃，改为使用 upload 包的模板方法优化
  */
 @Service
 @Slf4j
 @RequiredArgsConstructor
+@Deprecated
 public class FileManager {
 
     private final CosClientConfig cosClientConfig;
 
     private final CosManager cosManager;
-
-
 
 
     /**
@@ -75,12 +75,12 @@ public class FileManager {
             ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
             // 封装返回结果
             UploadPictureResult uploadPictureResult = new UploadPictureResult();
-            //图片的宽高
+            // 图片的宽高
             int picWidth = imageInfo.getWidth();
             int picHeight = imageInfo.getHeight();
-            //图片格式
+            // 图片格式
             String format = imageInfo.getFormat();
-            //图片大小
+            // 图片大小
             long size = FileUtil.size(file);
             // 计算图片缩放比例
             double picScale = NumberUtil.round(picWidth * 1.0 / picHeight, 2).doubleValue();
@@ -106,9 +106,14 @@ public class FileManager {
         }
     }
 
+    /**
+     * 导入图片的url上传图片
+     * @param fileUrl 图片url
+     * @param uploadPathPrefix 上传路径前缀
+     * @return
+     */
     public UploadPictureResult uploadPictureByUrl(String fileUrl, String uploadPathPrefix) {
         // 校验图片
-        // validPicture(multipartFile);
         validPicture(fileUrl);
         // 图片上传地址
         String uuid = RandomUtil.randomString(16);
@@ -124,16 +129,40 @@ public class FileManager {
             // multipartFile.transferTo(file);
             HttpUtil.downloadFile(fileUrl, file);
             // 上传图片
-            // ... 其余代码保持不变
+            PutObjectResult putObjectResult = cosManager.putPictureObject(uploadPath, file);
+            ImageInfo imageInfo = putObjectResult.getCiUploadResult().getOriginalInfo().getImageInfo();
+            // 封装返回结果
+            UploadPictureResult uploadPictureResult = new UploadPictureResult();
+            // 图片的宽高
+            int picWidth = imageInfo.getWidth();
+            int picHeight = imageInfo.getHeight();
+            // 图片格式
+            String format = imageInfo.getFormat();
+            // 图片大小
+            long size = FileUtil.size(file);
+            // 计算图片缩放比例
+            double picScale = NumberUtil.round(picWidth * 1.0 / picHeight, 2).doubleValue();
+            uploadPictureResult.setPicName(FileUtil.mainName(originFilename));
+            uploadPictureResult.setPicWidth(picWidth);
+            uploadPictureResult.setPicHeight(picHeight);
+            uploadPictureResult.setPicScale(picScale);
+            uploadPictureResult.setPicFormat(format);
+            uploadPictureResult.setPicSize(size);
+            uploadPictureResult.setUrl(cosClientConfig.getHost() + "/" + uploadPath);
+            return uploadPictureResult;
+        } catch (IOException e) {
+            log.error("图片文件IO异常, 文件名: {}, 错误信息: {}", originFilename, e.getMessage(), e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "文件读写失败");
+        } catch (CosServiceException e) {
+            log.error("COS服务异常, 文件名: {}, 错误信息: {}", originFilename, e.getMessage(), e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "云存储服务暂不可用");
         } catch (Exception e) {
-            log.error("图片上传到对象存储失败", e);
+            log.error("图片上传到对象存储失败, 文件名: {}, 错误信息: {}", originFilename, e.getMessage(), e);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
         } finally {
             this.deleteTempFile(file);
         }
-        return null;
     }
-
 
 
     /**
@@ -150,10 +179,15 @@ public class FileManager {
         // 2. 校验文件后缀
         String fileSuffix = FileUtil.getSuffix(multipartFile.getOriginalFilename());
         // 允许上传的文件后缀
-        final List<String> ALLOW_FORMAT_LIST = Arrays.asList("jpeg", "jpg", "png", "webp","heic");
+        final List<String> ALLOW_FORMAT_LIST = Arrays.asList("jpeg", "jpg", "png", "webp", "heic");
         ThrowUtils.throwIf(!ALLOW_FORMAT_LIST.contains(fileSuffix), ErrorCode.PARAMS_ERROR, "文件类型错误");
     }
 
+    /**
+     * 校验url
+     *
+     * @param fileUrl 文件url
+     */
     private void validPicture(String fileUrl) {
         ThrowUtils.throwIf(StrUtil.isBlank(fileUrl), ErrorCode.PARAMS_ERROR, "文件地址不能为空");
 

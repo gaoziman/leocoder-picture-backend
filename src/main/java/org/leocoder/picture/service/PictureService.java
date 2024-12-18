@@ -9,7 +9,6 @@ import org.leocoder.picture.domain.dto.picture.PictureQueryRequest;
 import org.leocoder.picture.domain.dto.picture.PictureReviewRequest;
 import org.leocoder.picture.domain.dto.picture.PictureUploadRequest;
 import org.leocoder.picture.domain.vo.picture.PictureVO;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -25,12 +24,12 @@ public interface PictureService extends IService<Picture> {
     /**
      * 上传图片
      *
-     * @param multipartFile        上传文件
+     * @param inputSource        上传文件
      * @param pictureUploadRequest 图片上传请求
      * @param loginUser            登录用户
      * @return 图片信息
      */
-    PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest, User loginUser);
+    PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser);
 
 
     /**
@@ -73,7 +72,7 @@ public interface PictureService extends IService<Picture> {
      * 图片审核
      *
      * @param requestParam 图片审核请求参数
-     * @param loginUser 登录用户
+     * @param loginUser    登录用户
      */
     void doPictureReview(PictureReviewRequest requestParam, User loginUser);
 

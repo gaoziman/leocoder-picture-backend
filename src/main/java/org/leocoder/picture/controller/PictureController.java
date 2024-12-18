@@ -48,9 +48,7 @@ public class PictureController {
     private final UserService userService;
 
 
-    /**
-     * 上传图片（可重新上传）
-     */
+
     @ApiOperation(value = "上传图片（可重新上传）")
     @PostMapping("/upload")
     // @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
@@ -61,6 +59,21 @@ public class PictureController {
         PictureVO pictureVO = pictureService.uploadPicture(multipartFile, pictureUploadRequest, loginUser);
         return ResultUtils.success(pictureVO);
     }
+
+    /**
+     * 通过 URL 上传图片（可重新上传）
+     */
+    @PostMapping("/upload/url")
+    @ApiOperation(value = "url上传图片")
+    public Result<PictureVO> uploadPictureByUrl(
+            @RequestBody PictureUploadRequest pictureUploadRequest,
+            HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        String fileUrl = pictureUploadRequest.getFileUrl();
+        PictureVO pictureVO = pictureService.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+        return ResultUtils.success(pictureVO);
+    }
+
 
 
     @ApiOperation(value = "删除图片")
@@ -205,8 +218,8 @@ public class PictureController {
     @ApiOperation(value = "初始化标签分类")
     public Result<PictureTagCategory> listPictureTagCategory() {
         PictureTagCategory pictureTagCategory = new PictureTagCategory();
-        List<String> tagList = Arrays.asList("热门", "搞笑", "生活", "高清", "艺术", "校园", "背景", "简历", "创意", "头像","临时");
-        List<String> categoryList = Arrays.asList("模板", "电商", "表情包", "素材", "海报");
+        List<String> tagList = Arrays.asList("热门", "头像","搞笑", "生活", "高清", "艺术", "校园", "风景", "简历", "创意", "资料","临时");
+        List<String> categoryList = Arrays.asList("个人","模板", "星球","面试题", "表情包", "素材", "学习", "Bugs" , "动物", "海报");
         pictureTagCategory.setTagList(tagList);
         pictureTagCategory.setCategoryList(categoryList);
         return ResultUtils.success(pictureTagCategory);

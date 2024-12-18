@@ -23,12 +23,14 @@ import org.leocoder.picture.exception.BusinessException;
 import org.leocoder.picture.exception.ErrorCode;
 import org.leocoder.picture.exception.ThrowUtils;
 import org.leocoder.picture.manager.FileManager;
+import org.leocoder.picture.manager.upload.FilePictureUpload;
+import org.leocoder.picture.manager.upload.PictureUploadTemplate;
+import org.leocoder.picture.manager.upload.UrlPictureUpload;
 import org.leocoder.picture.mapper.PictureMapper;
 import org.leocoder.picture.service.PictureService;
 import org.leocoder.picture.service.UserService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
@@ -53,17 +55,24 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
     private final UserService userService;
 
+    private final FilePictureUpload filePictureUpload;
+
+    private final UrlPictureUpload urlPictureUpload;
+
 
     /**
      * 上传图片
      *
-     * @param multipartFile 上传文件
-     * @param requestParam  图片上传请求
-     * @param loginUser     登录用户
-     * @return 图片信息
+     * @param inputSource  图片输入源
+     * @param requestParam 图片上传请求
+     * @param loginUser    登录用户
+     * @return 上传结果
      */
     @Override
-    public PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest requestParam, User loginUser) {
+    public PictureVO uploadPicture(Object inputSource, PictureUploadRequest requestParam, User loginUser) {
+        if (ObjectUtil.isEmpty(inputSource)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "图片为空");
+        }
         ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
         // 用于判断是新增还是更新图片
         Long pictureId = null;
@@ -81,10 +90,15 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             }
         }
 
-        // 上传图片，得到信息
         // 按照用户 id 划分目录
         String uploadPathPrefix = String.format("public/%s", loginUser.getId());
-        UploadPictureResult uploadPictureResult = fileManager.uploadPicture(multipartFile, uploadPathPrefix);
+        // 根据 inputSource 类型区分上传方式
+        PictureUploadTemplate pictureUploadTemplate = filePictureUpload;
+        if (inputSource instanceof String) {
+            pictureUploadTemplate = urlPictureUpload;
+        }
+        UploadPictureResult uploadPictureResult = pictureUploadTemplate.uploadPicture(inputSource, uploadPathPrefix);
+
         // 构造要入库的图片信息
         Picture picture = getPicture(loginUser, uploadPictureResult, pictureId);
         // 补充审核参数
@@ -93,7 +107,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "图片上传失败");
         return PictureVO.objToVo(picture);
     }
-
 
     /**
      * 获取图片信息
@@ -178,6 +191,14 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         lambdaQueryWrapper.eq(ObjUtil.isNotEmpty(picScale), Picture::getPicScale, picScale);
         lambdaQueryWrapper.eq(ObjUtil.isNotEmpty(reviewerId), Picture::getReviewerId, reviewerId);
         lambdaQueryWrapper.eq(ObjUtil.isNotEmpty(reviewStatus), Picture::getReviewStatus, reviewStatus);
+        // 排序 - 按照创建时间降序
+        if (StrUtil.isNotBlank(sortField)) {
+            boolean isAsc = "ascend".equalsIgnoreCase(sortOrder);
+            lambdaQueryWrapper.orderBy(true, isAsc, Picture::getCreateTime);
+        } else {
+            // 默认按照创建时间降序排序
+            lambdaQueryWrapper.orderByDesc(Picture::getCreateTime);
+        }
 
         // JSON 数组查询（标签）
         if (ObjUtil.isNotEmpty(tags)) {
