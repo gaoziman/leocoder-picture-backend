@@ -3,6 +3,7 @@ package org.leocoder.picture.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.leocoder.picture.domain.User;
+import org.leocoder.picture.domain.dto.user.UserInfoRequest;
 import org.leocoder.picture.domain.dto.user.UserQueryRequest;
 import org.leocoder.picture.domain.vo.user.LoginUserVO;
 import org.leocoder.picture.domain.vo.user.UserVO;
@@ -109,4 +110,11 @@ public interface UserService extends IService<User> {
     boolean isAdmin(User user);
 
 
+    /**
+     * 修改用户信息
+     *
+     * @param requestParam 用户信息请求参数
+     * @param request      请求对象
+     */
+    void updateUserInfo(UserInfoRequest requestParam,HttpServletRequest request);
 }

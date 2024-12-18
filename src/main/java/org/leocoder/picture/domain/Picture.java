@@ -94,6 +94,30 @@ public class Picture implements Serializable {
     private Long userId;
 
     /**
+     * 审核状态
+     */
+    @TableField(value = "review_status")
+    private Integer reviewStatus;
+
+    /**
+     *  审核内容
+     */
+    @TableField(value = "review_message")
+    private String reviewMessage;
+
+    /**
+     * 审核人 id
+     */
+    @TableField(value = "reviewer_id")
+    private Long reviewerId;
+
+    /**
+     * 审核时间
+     */
+    @TableField(value = "review_time")
+    private LocalDateTime reviewTime;
+
+    /**
      * 创建时间
      */
     @TableField(value = "create_time",fill = FieldFill.INSERT)

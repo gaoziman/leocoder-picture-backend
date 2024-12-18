@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.leocoder.picture.common.Result;
 import org.leocoder.picture.common.ResultUtils;
 import org.leocoder.picture.domain.User;
+import org.leocoder.picture.domain.dto.user.UserInfoRequest;
 import org.leocoder.picture.domain.dto.user.UserLoginRequest;
 import org.leocoder.picture.domain.dto.user.UserRegisterRequest;
 import org.leocoder.picture.domain.vo.user.LoginUserVO;
@@ -67,5 +68,14 @@ public class UserController {
         ThrowUtils.throwIf(ObjectUtil.isNull(request), ErrorCode.PARAMS_ERROR);
         boolean result = userService.userLogout(request);
         return ResultUtils.success(result);
+    }
+
+
+    @ApiOperation(value = "修改用户信息")
+    @PostMapping("/updateUserInfo")
+    public Result<Boolean> updateUserInfo(@RequestBody UserInfoRequest requestParam,HttpServletRequest request) {
+        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
+        userService.updateUserInfo(requestParam,request);
+        return ResultUtils.success(true);
     }
 }

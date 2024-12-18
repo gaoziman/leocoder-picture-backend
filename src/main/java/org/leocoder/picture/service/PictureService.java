@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import org.leocoder.picture.domain.Picture;
 import org.leocoder.picture.domain.User;
 import org.leocoder.picture.domain.dto.picture.PictureQueryRequest;
+import org.leocoder.picture.domain.dto.picture.PictureReviewRequest;
 import org.leocoder.picture.domain.dto.picture.PictureUploadRequest;
 import org.leocoder.picture.domain.vo.picture.PictureVO;
 import org.springframework.web.multipart.MultipartFile;
@@ -66,4 +67,21 @@ public interface PictureService extends IService<Picture> {
      * @param picture 图片信息
      */
     void validPicture(Picture picture);
+
+
+    /**
+     * 图片审核
+     *
+     * @param requestParam 图片审核请求参数
+     * @param loginUser 登录用户
+     */
+    void doPictureReview(PictureReviewRequest requestParam, User loginUser);
+
+    /**
+     * 填充审核参数
+     *
+     * @param picture   图片信息
+     * @param loginUser 登录用户
+     */
+    void fillReviewParams(Picture picture, User loginUser);
 }

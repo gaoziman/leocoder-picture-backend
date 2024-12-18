@@ -4,20 +4,22 @@ import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.COSObjectInputStream;
 import com.qcloud.cos.utils.IOUtils;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.leocoder.picture.annotation.AuthCheck;
 import org.leocoder.picture.common.Result;
 import org.leocoder.picture.common.ResultUtils;
 import org.leocoder.picture.constant.UserConstant;
+import org.leocoder.picture.domain.dto.file.UploadPictureResult;
 import org.leocoder.picture.exception.BusinessException;
 import org.leocoder.picture.exception.ErrorCode;
 import org.leocoder.picture.manager.CosManager;
+import org.leocoder.picture.manager.FileManager;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
 import java.io.IOException;
 
 /**
@@ -35,38 +37,20 @@ public class FileController {
 
     private final CosManager cosManager;
 
+    private final FileManager fileManager;
+
     /**
-     * 测试文件上传
+     * 文件上传
      *
      * @param multipartFile 上传的文件
      * @return 上传结果
      */
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    @PostMapping("/test/upload")
-    public Result<String> testUploadFile(@RequestPart("file") MultipartFile multipartFile) {
-        // 文件目录
-        String filename = multipartFile.getOriginalFilename();
-        String filepath = String.format("/test/%s", filename);
-        File file = null;
-        try {
-            // 上传文件
-            file = File.createTempFile(filepath, null);
-            multipartFile.transferTo(file);
-            cosManager.putObject(filepath, file);
-            // 返回可访问地址
-            return ResultUtils.success(filepath);
-        } catch (Exception e) {
-            log.error("file upload error, filepath = " + filepath, e);
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
-        } finally {
-            if (file != null) {
-                // 删除临时文件
-                boolean delete = file.delete();
-                if (!delete) {
-                    log.error("file delete error, filepath = {}", filepath);
-                }
-            }
-        }
+    @PostMapping("/upload")
+    @ApiOperation(value = "文件上传", notes = "上传文件到腾讯云对象存储")
+    public Result<String> UploadFile(@RequestPart("file") MultipartFile multipartFile) {
+        String uploadPathPrefix = String.format("public/%s", "avatar");
+        UploadPictureResult uploadPictureResult = fileManager.uploadPicture(multipartFile, uploadPathPrefix);
+        return ResultUtils.success(uploadPictureResult.getUrl());
     }
 
     /**
@@ -93,12 +77,15 @@ public class FileController {
         } catch (Exception e) {
             log.error("file download error, filepath = " + filepath, e);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "下载失败");
-        } finally {
+        } finally {ˆ
             if (cosObjectInput != null) {
                 cosObjectInput.close();
             }
         }
     }
+
+
+
 
 
 }

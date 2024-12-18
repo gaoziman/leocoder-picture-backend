@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.leocoder.picture.domain.User;
+import org.leocoder.picture.domain.dto.user.UserInfoRequest;
 import org.leocoder.picture.domain.dto.user.UserQueryRequest;
 import org.leocoder.picture.domain.vo.user.LoginUserVO;
 import org.leocoder.picture.domain.vo.user.UserVO;
@@ -182,6 +183,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public boolean isAdmin(User user) {
         return ObjectUtil.isNotNull(user) && UserRoleEnum.ADMIN.getValue().equals(user.getUserRole());
+    }
+
+    /**
+     * 修改用户信息
+     *
+     * @param requestParam 用户信息请求参数
+     * @param request 请求对象
+     */
+    @Override
+    public void updateUserInfo(UserInfoRequest requestParam,HttpServletRequest request) {
+        // 获取登录用户
+        User loginUser = this.getLoginUser(request);
+        requestParam.setId(loginUser.getId());
+        // 校验参数
+        User user = new User();
+        BeanUtils.copyProperties(requestParam,user);
+        boolean result = this.updateById(user);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "修改用户信息失败");
     }
 
     /**
