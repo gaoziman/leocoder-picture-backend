@@ -60,3 +60,49 @@ ALTER TABLE picture
 
 -- 创建基于 reviewStatus 列的索引
 CREATE INDEX idx_review_status ON picture (review_status);
+
+
+-- 用户点赞表
+CREATE TABLE IF NOT EXISTS user_like (
+                                         id          BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '点赞ID',
+                                         user_id     BIGINT NOT NULL COMMENT '用户ID',
+                                         picture_id  BIGINT NOT NULL COMMENT '图片ID',
+                                         create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '点赞时间',
+                                         UNIQUE KEY uk_user_picture (user_id, picture_id),  -- 防止重复点赞
+                                         INDEX idx_picture_id (picture_id)                 -- 提升图片点赞查询效率
+) COMMENT '用户点赞表';
+
+
+-- 用户收藏表
+CREATE TABLE IF NOT EXISTS user_favorite (
+                                             id          BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '收藏ID',
+                                             user_id     BIGINT NOT NULL COMMENT '用户ID',
+                                             picture_id  BIGINT NOT NULL COMMENT '图片ID',
+                                             create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+                                             UNIQUE KEY uk_user_picture (user_id, picture_id),
+                                             INDEX idx_picture_id (picture_id)
+) COMMENT '用户收藏表';
+
+
+-- 图片评论表
+CREATE TABLE IF NOT EXISTS comment (
+                                       id          BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '评论ID',
+                                       picture_id  BIGINT NOT NULL COMMENT '图片ID',
+                                       user_id     BIGINT NOT NULL COMMENT '用户ID',
+                                       parent_id   BIGINT NULL COMMENT '父评论ID',
+                                       content     VARCHAR(1024) NOT NULL COMMENT '评论内容',
+                                       create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '评论时间',
+                                       INDEX idx_picture_id (picture_id),
+                                       INDEX idx_parent_id (parent_id)
+) COMMENT '图片评论表';
+
+
+-- 用户积分记录表
+CREATE TABLE IF NOT EXISTS user_points (
+                                           id          BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '积分ID',
+                                           user_id     BIGINT NOT NULL COMMENT '用户ID',
+                                           action      VARCHAR(64) NOT NULL COMMENT '操作类型：like, comment, upload',
+                                           points      INT NOT NULL COMMENT '积分值',
+                                           create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+                                           INDEX idx_user_id (user_id)
+) COMMENT '用户积分记录表';
