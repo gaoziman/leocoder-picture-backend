@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.leocoder.picture.domain.User;
 import org.leocoder.picture.domain.dto.user.UserInfoRequest;
+import org.leocoder.picture.domain.dto.user.UserPasswordRequest;
 import org.leocoder.picture.domain.dto.user.UserQueryRequest;
 import org.leocoder.picture.domain.vo.user.LoginUserVO;
 import org.leocoder.picture.domain.vo.user.UserVO;
@@ -116,5 +117,14 @@ public interface UserService extends IService<User> {
      * @param requestParam 用户信息请求参数
      * @param request      请求对象
      */
-    void updateUserInfo(UserInfoRequest requestParam,HttpServletRequest request);
+    void updateUserInfo(UserInfoRequest requestParam, HttpServletRequest request);
+
+
+    /**
+     * 修改用户密码
+     *
+     * @param requestParam 用户信息请求参数
+     * @param request      请求对象
+     */
+    void updateUserPassword(UserPasswordRequest requestParam, HttpServletRequest request);
 }

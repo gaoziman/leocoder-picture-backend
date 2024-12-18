@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.leocoder.picture.domain.User;
 import org.leocoder.picture.domain.dto.user.UserInfoRequest;
+import org.leocoder.picture.domain.dto.user.UserPasswordRequest;
 import org.leocoder.picture.domain.dto.user.UserQueryRequest;
 import org.leocoder.picture.domain.vo.user.LoginUserVO;
 import org.leocoder.picture.domain.vo.user.UserVO;
@@ -189,18 +190,58 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * 修改用户信息
      *
      * @param requestParam 用户信息请求参数
-     * @param request 请求对象
+     * @param request      请求对象
      */
     @Override
-    public void updateUserInfo(UserInfoRequest requestParam,HttpServletRequest request) {
+    public void updateUserInfo(UserInfoRequest requestParam, HttpServletRequest request) {
         // 获取登录用户
         User loginUser = this.getLoginUser(request);
         requestParam.setId(loginUser.getId());
         // 校验参数
         User user = new User();
-        BeanUtils.copyProperties(requestParam,user);
+        BeanUtils.copyProperties(requestParam, user);
         boolean result = this.updateById(user);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "修改用户信息失败");
+    }
+
+    /**
+     * 修改用户密码
+     *
+     * @param requestParam 用户信息请求参数
+     * @param request      请求对象
+     */
+    @Override
+    public void updateUserPassword(UserPasswordRequest requestParam, HttpServletRequest request) {
+        // 获取登录用户
+        User loginUser = this.getLoginUser(request);
+        String oldPassword = requestParam.getOldPassword();
+        String newPassword = requestParam.getNewPassword();
+        String checkPassword = requestParam.getCheckPassword();
+        String oldEncryptPassword = encryptPassword(oldPassword);
+
+        // 1. 校验参数
+        // 通过旧密码查询用户
+        LambdaQueryWrapper<User> lambdaQueryWrapper = Wrappers.lambdaQuery(User.class)
+                .eq(User::getId, loginUser.getId())
+                .eq(User::getUserPassword, oldEncryptPassword);
+        User user = this.getOne(lambdaQueryWrapper);
+        ThrowUtils.throwIf(StrUtil.hasBlank(oldPassword, newPassword, checkPassword), ErrorCode.PARAMS_ERROR, "参数为空");
+        ThrowUtils.throwIf(ObjectUtil.isNull(user), ErrorCode.BUSINESS_ERROR, "旧密码错误");
+        ThrowUtils.throwIf(newPassword.length() < 8 || checkPassword.length() < 8, ErrorCode.PARAMS_ERROR, "密码不能小于8位");
+        ThrowUtils.throwIf(!newPassword.equals(checkPassword), ErrorCode.PARAMS_ERROR, "两次密码输入不一致");
+
+        // 2. 加密
+        String encryptPassword = encryptPassword(newPassword);
+        ThrowUtils.throwIf(encryptPassword.equals(loginUser.getUserPassword()), ErrorCode.PARAMS_ERROR, "新密码不能与旧密码相同");
+
+
+
+        // 3. 修改密码
+        User updatedUser = new User();
+        updatedUser.setId(loginUser.getId());
+        updatedUser.setUserPassword(encryptPassword);
+        boolean result = this.updateById(updatedUser);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "修改密码失败");
     }
 
     /**

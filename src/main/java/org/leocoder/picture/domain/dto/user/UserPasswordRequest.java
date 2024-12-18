@@ -19,4 +19,9 @@ public class UserPasswordRequest {
      * 新密码
      */
     private String newPassword;
+
+    /**
+     * 确认新密码
+     */
+    private String checkPassword;
 }

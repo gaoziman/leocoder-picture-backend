@@ -7,9 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.leocoder.picture.common.Result;
 import org.leocoder.picture.common.ResultUtils;
 import org.leocoder.picture.domain.User;
-import org.leocoder.picture.domain.dto.user.UserInfoRequest;
-import org.leocoder.picture.domain.dto.user.UserLoginRequest;
-import org.leocoder.picture.domain.dto.user.UserRegisterRequest;
+import org.leocoder.picture.domain.dto.user.*;
 import org.leocoder.picture.domain.vo.user.LoginUserVO;
 import org.leocoder.picture.exception.ErrorCode;
 import org.leocoder.picture.exception.ThrowUtils;
@@ -76,6 +74,15 @@ public class UserController {
     public Result<Boolean> updateUserInfo(@RequestBody UserInfoRequest requestParam,HttpServletRequest request) {
         ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
         userService.updateUserInfo(requestParam,request);
+        return ResultUtils.success(true);
+    }
+
+
+    @ApiOperation(value = "修改用户密码")
+    @PostMapping("/updateUserPassword")
+    public Result<Boolean> updateUserPassword(@RequestBody UserPasswordRequest requestParam, HttpServletRequest request) {
+        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
+        userService.updateUserPassword(requestParam,request);
         return ResultUtils.success(true);
     }
 }

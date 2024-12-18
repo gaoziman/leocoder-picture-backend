@@ -77,7 +77,7 @@ public class FileController {
         } catch (Exception e) {
             log.error("file download error, filepath = " + filepath, e);
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "下载失败");
-        } finally {ˆ
+        } finally {
             if (cosObjectInput != null) {
                 cosObjectInput.close();
             }
