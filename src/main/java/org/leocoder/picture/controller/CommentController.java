@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/comment")
 @RequiredArgsConstructor
 @Api(tags = "图片评论管理")
-public class CommentController {ˆ
+public class CommentController {
 
 
     private final CommentService commentService;
