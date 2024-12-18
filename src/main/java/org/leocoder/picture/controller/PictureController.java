@@ -236,4 +236,18 @@ public class PictureController {
         pictureService.doPictureReview(requestParam, loginUser);
         return ResultUtils.success(true);
     }
+
+
+    @PostMapping("/upload/batch")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public Result<Integer> uploadPictureByBatch(
+            @RequestBody PictureUploadByBatchRequest requestParam,
+            HttpServletRequest request
+    ) {
+        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        int uploadCount = pictureService.uploadPictureByBatch(requestParam, loginUser);
+        return ResultUtils.success(uploadCount);
+    }
+
 }

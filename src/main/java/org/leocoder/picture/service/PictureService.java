@@ -7,6 +7,7 @@ import org.leocoder.picture.domain.Picture;
 import org.leocoder.picture.domain.User;
 import org.leocoder.picture.domain.dto.picture.PictureQueryRequest;
 import org.leocoder.picture.domain.dto.picture.PictureReviewRequest;
+import org.leocoder.picture.domain.dto.picture.PictureUploadByBatchRequest;
 import org.leocoder.picture.domain.dto.picture.PictureUploadRequest;
 import org.leocoder.picture.domain.vo.picture.PictureVO;
 
@@ -83,4 +84,15 @@ public interface PictureService extends IService<Picture> {
      * @param loginUser 登录用户
      */
     void fillReviewParams(Picture picture, User loginUser);
+
+
+    /**
+     * 批量抓取和创建图片
+     *
+     * @param requestParam  批量抓取请求参数
+     * @param loginUser 登录用户
+     * @return 成功创建的图片数
+     */
+    Integer uploadPictureByBatch(PictureUploadByBatchRequest requestParam, User loginUser);
+
 }
