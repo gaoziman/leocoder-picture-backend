@@ -26,4 +26,9 @@ public class PictureUploadByBatchRequest {
      */
     private String namePrefix;
 
+    /**
+     * 搜索源
+     */
+    private String source;
+
 }

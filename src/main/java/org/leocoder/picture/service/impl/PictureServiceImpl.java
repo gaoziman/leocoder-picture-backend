@@ -8,6 +8,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.Response;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
@@ -39,6 +48,9 @@ import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -106,7 +118,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         UploadPictureResult uploadPictureResult = pictureUploadTemplate.uploadPicture(inputSource, uploadPathPrefix);
 
         // 构造要入库的图片信息
-        Picture picture = getPicture(loginUser, uploadPictureResult, pictureId,requestParam);
+        Picture picture = getPicture(loginUser, uploadPictureResult, pictureId, requestParam);
         // 补充审核参数
         fillReviewParams(picture, loginUser);
         boolean result = this.saveOrUpdate(picture);
@@ -122,7 +134,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
      * @param pictureId           图片 id
      * @return 图片信息
      */
-    private static Picture getPicture(User loginUser, UploadPictureResult uploadPictureResult, Long pictureId,PictureUploadRequest requestParam) {
+    private static Picture getPicture(User loginUser, UploadPictureResult uploadPictureResult, Long pictureId, PictureUploadRequest requestParam) {
         Picture picture = Picture.builder().build();
         picture.setUrl(uploadPictureResult.getUrl());
         String picName = uploadPictureResult.getPicName();
@@ -359,21 +371,100 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         }
     }
 
-    /**
-     * 批量抓取和创建图片
-     *
-     * @param requestParam  批量抓取请求参数
-     * @param loginUser 登录用户
-     * @return 成功创建的图片数
-     */
+
     @Override
     public Integer uploadPictureByBatch(PictureUploadByBatchRequest requestParam, User loginUser) {
         String searchText = requestParam.getSearchText();
-        // 格式化数量
         Integer count = requestParam.getCount();
+        String source = requestParam.getSource();
+        String namePrefix = requestParam.getNamePrefix();
+        ThrowUtils.throwIf(StrUtil.isBlank(searchText), ErrorCode.PARAMS_ERROR, "搜索关键字不能为空");
+        ThrowUtils.throwIf(count == null || count <= 0 || count > 30, ErrorCode.PARAMS_ERROR, "抓取数量不合法");
+        ThrowUtils.throwIf(StrUtil.isBlank(source), ErrorCode.PARAMS_ERROR, "抓取源不能为空");
+
+        int uploadCount = 0;
+
+        try {
+            if ("baidu".equalsIgnoreCase(source)) {
+                uploadCount = fetchFromBaidu(searchText, count, loginUser, namePrefix);
+            } else if ("google".equalsIgnoreCase(source)) {
+                uploadCount = fetchFromGoogle(searchText, count, loginUser, namePrefix);
+            } else if ("bing".equalsIgnoreCase(source)) {
+                uploadCount = fetchFromBing(searchText, count, loginUser, namePrefix);
+            } else {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "未知的抓取源：" + source);
+            }
+        } catch (Exception e) {
+            log.error("批量抓取图片失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取图片失败");
+        }
+
+        return uploadCount;
+    }
+
+
+    public Integer fetchFromBaidu(String searchText, Integer count, User loginUser, String namePrefix) {
+        ThrowUtils.throwIf(count > 30, ErrorCode.PARAMS_ERROR, "最多 30 条");
+
+        String fetchUrl = String.format("https://images.baidu.com/search/acjson?tn=resultjson_com&word=%s", searchText);
+        int uploadCount = 0;
+
+        try {
+            // 发送 HTTP 请求获取 JSON 数据
+            URL url = new URL(fetchUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Content-Type", "application/json");
+            InputStreamReader reader = new InputStreamReader(connection.getInputStream(), "UTF-8");
+
+            // 使用 Gson 解析 JSON 数据
+            JsonObject jsonResponse = JsonParser.parseReader(reader).getAsJsonObject();
+            JsonArray imgArray = jsonResponse.getAsJsonArray("data");
+
+            for (JsonElement element : imgArray) {
+                if (element.isJsonObject()) {
+                    JsonObject imgObject = element.getAsJsonObject();
+                    String fileUrl = imgObject.get("thumbURL") != null ? imgObject.get("thumbURL").getAsString() : null;
+                    if (StrUtil.isBlank(fileUrl)) {
+                        continue; // 跳过空链接
+                    }
+
+                    if (StrUtil.isBlank(namePrefix)) {
+                        namePrefix = searchText;
+                    }
+
+                    // 上传图片
+                    PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+                    pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+
+                    try {
+                        PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+                        log.info("图片上传成功, id = {}", pictureVO.getId());
+                        uploadCount++;
+                    } catch (Exception e) {
+                        log.error("图片上传失败", e);
+                        continue;
+                    }
+
+                    if (uploadCount >= count) {
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("批量抓取图片失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取图片失败");
+        }
+
+        return uploadCount;
+    }
+
+
+    public Integer fetchFromBing(String searchText, Integer count, User loginUser, String namePrefix) {
         ThrowUtils.throwIf(count > 30, ErrorCode.PARAMS_ERROR, "最多 30 条");
         // 要抓取的地址
         String fetchUrl = String.format("https://cn.bing.com/images/async?q=%s&mmasync=1", searchText);
+
         Document document;
         try {
             document = Jsoup.connect(fetchUrl).get();
@@ -398,7 +489,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             if (questionMarkIndex > -1) {
                 fileUrl = fileUrl.substring(0, questionMarkIndex);
             }
-            String namePrefix = requestParam.getNamePrefix();
             if (StrUtil.isBlank(namePrefix)) {
                 namePrefix = searchText;
             }
@@ -424,4 +514,58 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     }
 
 
+    public Integer fetchFromGoogle(String searchText, Integer count, User loginUser, String namePrefix) {
+        int uploadCount = 0;
+        String apiKey = "AIzaSyBvU3jEggN8AtpNcF14jyty69rFvhLlQWA";
+        String cx = "f112f91a23b674acc";
+
+        // 构建 API 请求 URL
+        String apiUrl = String.format("https://www.googleapis.com/customsearch/v1?q=%s&num=%d&searchType=image&key=%s&cx=%s",
+                searchText, count, apiKey, cx);
+
+        OkHttpClient client = new OkHttpClient();
+
+        try {
+            Request request = new Request.Builder().url(apiUrl).build();
+            Response response = client.newCall(request).execute();
+
+            if (!response.isSuccessful()) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR, "API 调用失败");
+            }
+
+            String responseBody = response.body().string();
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode items = objectMapper.readTree(responseBody).get("items");
+
+            for (JsonNode item : items) {
+                String fileUrl = item.get("link").asText();
+
+                if (StrUtil.isBlank(namePrefix)) {
+                    namePrefix = searchText;
+                }
+
+                // 上传图片
+                PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+                pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+
+                try {
+                    PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+                    log.info("图片上传成功, id = {}", pictureVO.getId());
+                    uploadCount++;
+                } catch (Exception e) {
+                    log.error("图片上传失败", e);
+                    continue;
+                }
+
+                if (uploadCount >= count) {
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            log.error("批量抓取谷歌图片失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取谷歌图片失败");
+        }
+
+        return uploadCount;
+    }
 }

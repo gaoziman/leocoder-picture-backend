@@ -97,6 +97,26 @@ public class PictureController {
         return ResultUtils.success(true);
     }
 
+    @ApiOperation(value = "批量删除图片")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @PostMapping("/deleteBatchPicture")
+    public Result<Boolean> deleteBatchPicture(@RequestBody DeleteBatchRequest requestParam, HttpServletRequest request) {
+        if (ObjectUtil.isEmpty(requestParam)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        // 仅管理员可删除
+        if ( !userService.isAdmin(loginUser)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        // 操作数据库
+        boolean result = pictureService.removeBatchByIds(requestParam.getIds());
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
+    }
+
+
+
 
     @ApiOperation(value = "更新图片（仅管理员可用）")
     @PostMapping("/update")
