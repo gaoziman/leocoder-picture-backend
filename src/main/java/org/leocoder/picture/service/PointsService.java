@@ -1,6 +1,6 @@
 package org.leocoder.picture.service;
 
-import org.leocoder.picture.domain.UserPoints;
+import org.leocoder.picture.domain.Points;
 import com.baomidou.mybatisplus.extension.service.IService;
     /**
  * @author : 程序员Leo
@@ -9,7 +9,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
  * @description :
  */
 
-public interface UserPointsService extends IService<UserPoints>{
+public interface PointsService extends IService<Points>{
 
 
 }

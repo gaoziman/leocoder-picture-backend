@@ -1,7 +1,7 @@
 package org.leocoder.picture.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import org.leocoder.picture.domain.UserPoints;
+import org.leocoder.picture.domain.Points;
 
 /**
  * @author : 程序员Leo
@@ -10,5 +10,5 @@ import org.leocoder.picture.domain.UserPoints;
  * @description :
  */
 
-public interface UserPointsMapper extends BaseMapper<UserPoints> {
+public interface PointsMapper extends BaseMapper<Points> {
 }

@@ -1,7 +1,7 @@
 package org.leocoder.picture.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.leocoder.picture.service.UserPointsService;
+import org.leocoder.picture.service.PointsService;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -14,9 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/user_points")
 @RequiredArgsConstructor
-public class UserPointsController {
+public class PointsController {
 
-    private final UserPointsService userPointsService;
+    private final PointsService userPointsService;
 
 
 }

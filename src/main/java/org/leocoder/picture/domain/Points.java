@@ -13,18 +13,17 @@ import java.time.LocalDateTime;
  * @author : 程序员Leo
  * @date  2024-12-18 21:21
  * @version 1.0
- * @description : 用户点赞表
+ * @description : 用户积分记录表
  */
-
 
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@TableName(value = "user_like")
-public class UserLike implements Serializable {
+@TableName(value = "user_points")
+public class Points implements Serializable {
     /**
-     * 点赞ID
+     * 积分ID
      */
     @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
@@ -36,13 +35,19 @@ public class UserLike implements Serializable {
     private Long userId;
 
     /**
-     * 图片ID
+     * 操作类型：like, comment, upload
      */
-    @TableField(value = "picture_id")
-    private Long pictureId;
+    @TableField(value = "`action`")
+    private String action;
 
     /**
-     * 点赞时间
+     * 积分值
+     */
+    @TableField(value = "points")
+    private Integer points;
+
+    /**
+     * 操作时间
      */
     @TableField(value = "create_time",fill = FieldFill.INSERT)
     private LocalDateTime createTime;

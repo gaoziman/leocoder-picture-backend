@@ -23,6 +23,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.leocoder.picture.domain.Like;
 import org.leocoder.picture.domain.Picture;
 import org.leocoder.picture.domain.User;
 import org.leocoder.picture.domain.dto.file.UploadPictureResult;
@@ -41,6 +42,7 @@ import org.leocoder.picture.manager.upload.FilePictureUpload;
 import org.leocoder.picture.manager.upload.PictureUploadTemplate;
 import org.leocoder.picture.manager.upload.UrlPictureUpload;
 import org.leocoder.picture.mapper.PictureMapper;
+import org.leocoder.picture.service.LikeService;
 import org.leocoder.picture.service.PictureService;
 import org.leocoder.picture.service.UserService;
 import org.springframework.beans.BeanUtils;
@@ -77,6 +79,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
     private final UrlPictureUpload urlPictureUpload;
 
+    private final LikeService likeService;
 
     /**
      * 上传图片
@@ -247,6 +250,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
      */
     @Override
     public PictureVO getPictureVO(Picture picture, HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
         // 对象转封装类
         PictureVO pictureVO = PictureVO.objToVo(picture);
         // 关联查询用户信息
@@ -255,6 +259,15 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             User user = userService.getById(userId);
             UserVO userVO = userService.getUserVO(user);
             pictureVO.setUser(userVO);
+            // 查询图片的点赞状态
+            Like like = likeService.getOne(Wrappers.lambdaQuery(Like.class)
+                    .eq(Like::getPictureId, picture.getId())
+                    .eq(Like::getUserId, loginUser.getId()));
+            if (ObjectUtil.isNotNull(like)) {
+                pictureVO.setIsLiked(like.getIsLiked());
+            }else {
+                pictureVO.setIsLiked(0);
+            }
         }
         return pictureVO;
     }

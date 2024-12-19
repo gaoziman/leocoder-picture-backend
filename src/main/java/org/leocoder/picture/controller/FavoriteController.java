@@ -1,7 +1,7 @@
 package org.leocoder.picture.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.leocoder.picture.service.UserFavoriteService;
+import org.leocoder.picture.service.FavoriteService;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/user_favorite")
 @RequiredArgsConstructor
-public class UserFavoriteController {
+public class FavoriteController {
 
-    private final UserFavoriteService userFavoriteService;
+    private final FavoriteService userFavoriteService;
 
 }

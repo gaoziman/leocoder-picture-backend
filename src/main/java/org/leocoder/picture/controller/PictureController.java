@@ -2,6 +2,7 @@ package org.leocoder.picture.controller;
 
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -11,6 +12,7 @@ import org.leocoder.picture.common.DeleteRequest;
 import org.leocoder.picture.common.Result;
 import org.leocoder.picture.common.ResultUtils;
 import org.leocoder.picture.constant.UserConstant;
+import org.leocoder.picture.domain.Like;
 import org.leocoder.picture.domain.Picture;
 import org.leocoder.picture.domain.User;
 import org.leocoder.picture.domain.dto.picture.*;
@@ -20,9 +22,11 @@ import org.leocoder.picture.enums.PictureReviewStatusEnum;
 import org.leocoder.picture.exception.BusinessException;
 import org.leocoder.picture.exception.ErrorCode;
 import org.leocoder.picture.exception.ThrowUtils;
+import org.leocoder.picture.service.LikeService;
 import org.leocoder.picture.service.PictureService;
 import org.leocoder.picture.service.UserService;
 import org.springframework.beans.BeanUtils;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -46,6 +50,9 @@ public class PictureController {
     private final PictureService pictureService;
 
     private final UserService userService;
+
+    private final LikeService likeService;
+
 
 
 
@@ -78,6 +85,7 @@ public class PictureController {
 
     @ApiOperation(value = "删除图片")
     @PostMapping("/delete")
+    @Transactional
     public Result<Boolean> deletePicture(@RequestBody DeleteRequest deleteRequest, HttpServletRequest request) {
         if (deleteRequest == null || deleteRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -94,6 +102,13 @@ public class PictureController {
         // 操作数据库
         boolean result = pictureService.removeById(id);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        // 删除点赞记录（仅当点赞记录存在时才删除）
+        long likeCount = likeService.count(new QueryWrapper<Like>().eq("picture_id", id));
+        if (likeCount > 0) {
+            boolean removed = likeService.remove(new QueryWrapper<Like>().eq("picture_id", id));
+            ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR);
+        }
+        // 删除评论记录
         return ResultUtils.success(true);
     }
 
@@ -109,9 +124,19 @@ public class PictureController {
         if ( !userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
-        // 操作数据库
-        boolean result = pictureService.removeBatchByIds(requestParam.getIds());
+        // 获取要删除的图片ID列表
+        List<Long> ids = requestParam.getIds();
+
+        // 操作数据库：批量删除图片
+        boolean result = pictureService.removeBatchByIds(ids);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+
+        // 删除点赞记录（仅删除有点赞记录的图片）
+        long likeCount = likeService.count(new QueryWrapper<Like>().in("picture_id", ids));
+        if (likeCount > 0) {
+            boolean likeRemoved = likeService.remove(new QueryWrapper<Like>().in("picture_id", ids));
+            ThrowUtils.throwIf(!likeRemoved, ErrorCode.OPERATION_ERROR);
+        }
         return ResultUtils.success(true);
     }
 
@@ -257,7 +282,7 @@ public class PictureController {
         return ResultUtils.success(true);
     }
 
-
+    @ApiOperation(value = "批量导入图片")
     @PostMapping("/upload/batch")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public Result<Integer> uploadPictureByBatch(

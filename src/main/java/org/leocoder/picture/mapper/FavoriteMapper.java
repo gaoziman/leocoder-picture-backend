@@ -1,7 +1,7 @@
 package org.leocoder.picture.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import org.leocoder.picture.domain.UserLike;
+import org.leocoder.picture.domain.Favorite;
 
 /**
  * @author : 程序员Leo
@@ -10,5 +10,5 @@ import org.leocoder.picture.domain.UserLike;
  * @description :
  */
 
-public interface UserLikeMapper extends BaseMapper<UserLike> {
+public interface FavoriteMapper extends BaseMapper<Favorite> {
 }

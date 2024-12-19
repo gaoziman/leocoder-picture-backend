@@ -135,6 +135,9 @@ public class Picture implements Serializable {
     @TableField(value = "update_time",fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
+    @TableField(value = "like_count")
+    private Integer likeCount;
+
     /**
      * 是否删除
      */
