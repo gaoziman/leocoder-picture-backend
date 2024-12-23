@@ -11,4 +11,5 @@ import org.leocoder.picture.domain.Comment;
  */
 
 public interface CommentMapper extends BaseMapper<Comment> {
+
 }

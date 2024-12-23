@@ -16,4 +16,9 @@ public class LikeRequest {
      * 图片id
      */
     private Long pictureId;
+
+    /**
+     * 点赞类型
+     */
+    private Integer likeType;
 }

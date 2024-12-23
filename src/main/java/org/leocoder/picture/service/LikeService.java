@@ -18,9 +18,10 @@ public interface LikeService extends IService<Like> {
      *
      * @param userId    用户id
      * @param pictureId 图片id
+     * @param likeType  点赞类型  0表示图片 1表示评论
      * @return true表示点赞成功，false表示点赞失败
      */
-    boolean likePicture(Long userId, Long pictureId);
+    boolean likePicture(Long userId, Long pictureId, Integer likeType);
 
 
     /**
@@ -28,7 +29,8 @@ public interface LikeService extends IService<Like> {
      *
      * @param userId    用户id
      * @param pictureId 图片id
-     * @return true表示取消点赞成功，false表示取消点赞失败
+     * @param likeType  取消点赞类型  0表示图片 1表示评论
+     * @return true表示取消成功，false表示取消失败
      */
-    boolean cancelLike(Long userId, Long pictureId);
+    boolean cancelLike(Long userId, Long pictureId, Integer likeType);
 }

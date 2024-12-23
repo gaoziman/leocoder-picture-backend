@@ -16,4 +16,9 @@ public class CancelLikeRequest {
      * 图片id
      */
     private Long pictureId;
+
+    /**
+     * 取消点赞的类型
+     */
+    private Integer likeType;
 }

@@ -58,5 +58,12 @@ public class Comment implements Serializable {
     @TableField(value = "create_time",fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
+    /**
+     * 评论点赞数
+     */
+    @TableField(value = "like_count")
+    private Integer likeCount;
+
+
     private static final long serialVersionUID = 1L;
 }

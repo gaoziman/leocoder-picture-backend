@@ -50,5 +50,8 @@ public class Like implements Serializable {
     @TableField(value = "is_liked")
     private Integer isLiked;
 
+    @TableField(value = "like_type")
+    private Integer likeType;
+
     private static final long serialVersionUID = 1L;
 }

@@ -14,6 +14,7 @@
         id,
         user_id,
         picture_id,
+        like_type,
         create_time
     </sql>
 
@@ -24,6 +25,7 @@
         where
             user_id = #{userId}
             and picture_id = #{pictureId}
+        AND like_type = #{likeType}
     </select>
 
     <delete id="deleteByUserIdAndPictureId">
@@ -31,5 +33,6 @@
         FROM user_like
         WHERE user_id = #{userId}
           AND picture_id = #{pictureId}
+        AND like_type = #{likeType}
     </delete>
 </mapper>

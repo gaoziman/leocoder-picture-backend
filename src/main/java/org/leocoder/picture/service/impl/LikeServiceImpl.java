@@ -42,11 +42,12 @@ public class LikeServiceImpl extends ServiceImpl<LikeMapper, Like> implements Li
      *
      * @param userId    用户id
      * @param pictureId 图片id
+     * @param likeType  点赞类型  0表示图片 1表示评论
      * @return true表示点赞成功，false表示点赞失败
      */
     @Override
     @Transactional
-    public boolean likePicture(Long userId, Long pictureId) {
+    public boolean likePicture(Long userId, Long pictureId,Integer likeType) {
         // 检查用户是否已经点赞
         String likeCacheKey = "user:" + userId + ":liked:" + pictureId;
         log.info("用户[{}]已经点赞过图片[{}]", userId, pictureId);
@@ -56,6 +57,7 @@ public class LikeServiceImpl extends ServiceImpl<LikeMapper, Like> implements Li
         Like userLike = new Like();
         userLike.setUserId(userId);
         userLike.setPictureId(pictureId);
+        userLike.setLikeType(likeType);
         userLike.setIsLiked(1);
         userLikeMapper.insert(userLike);
 
@@ -84,20 +86,21 @@ public class LikeServiceImpl extends ServiceImpl<LikeMapper, Like> implements Li
      *
      * @param userId    用户id
      * @param pictureId 图片id
-     * @return true表示取消点赞成功，false表示取消点赞失败
+     * @param likeType  取消点赞类型  0表示图片 1表示评论
+     * @return true表示取消成功，false表示取消失败
      */
     @Override
     @Transactional
-    public boolean cancelLike(Long userId, Long pictureId) {
+    public boolean cancelLike(Long userId, Long pictureId,Integer likeType) {
         // 检查用户是否点赞过
         String likeCacheKey = "user:" + userId + ":liked:" + pictureId;
 
-        Like userLike = userLikeMapper.findByUserIdAndPictureId(userId, pictureId);
+        Like userLike = userLikeMapper.findByUserIdAndPictureId(userId, pictureId,likeType);
 
         ThrowUtils.throwIf(!redisTemplate.hasKey(likeCacheKey) && ObjectUtil.isNull(userLike), ErrorCode.BUSINESS_ERROR, " 用户未点赞，无法取消");
 
         // 删除点赞记录
-        userLikeMapper.deleteByUserIdAndPictureId(userId, pictureId);
+        userLikeMapper.deleteByUserIdAndPictureId(userId, pictureId,likeType);
 
         // 更新图片的点赞数
         pictureMapper.decrementLikeCount(pictureId);

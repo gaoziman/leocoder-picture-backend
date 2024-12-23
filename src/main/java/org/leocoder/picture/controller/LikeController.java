@@ -1,5 +1,6 @@
 package org.leocoder.picture.controller;
 
+import cn.hutool.core.util.ObjectUtil;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
@@ -36,10 +37,13 @@ public class LikeController {
     @ApiOperation("点赞图片")
     @PostMapping("/like")
     public Result<Boolean> like(@RequestBody LikeRequest requestParam, HttpServletRequest request) {
+        // 校验参数
+        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(request);
         Long pictureId = requestParam.getPictureId();
+        Integer likeType = requestParam.getLikeType();
 
-        boolean result = likeService.likePicture(loginUser.getId(), pictureId);
+        boolean result = likeService.likePicture(loginUser.getId(), pictureId,likeType);
         ThrowUtils.throwIf(!result, ErrorCode.BUSINESS_ERROR, "您已点赞过该图片");
         return ResultUtils.success(true);
     }
@@ -47,10 +51,14 @@ public class LikeController {
     @ApiOperation("取消点赞图片")
     @PostMapping("/cancelLike")
     public Result<Boolean> cancelLike(@RequestBody CancelLikeRequest requestParam, HttpServletRequest request) {
+        // 校验参数
+        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(request);
         Long pictureId = requestParam.getPictureId();
+        Integer likeType = requestParam.getLikeType();
 
-        boolean result = likeService.cancelLike(loginUser.getId(), pictureId);
+
+        boolean result = likeService.cancelLike(loginUser.getId(), pictureId,likeType);
 
         ThrowUtils.throwIf(!result, ErrorCode.BUSINESS_ERROR, "您未点赞过该图片");
         return ResultUtils.success(true);
