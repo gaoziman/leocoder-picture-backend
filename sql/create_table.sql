@@ -57,9 +57,21 @@ ALTER TABLE picture
     ADD COLUMN review_message VARCHAR(512) NULL COMMENT '审核信息',
     ADD COLUMN reviewer_id BIGINT NULL COMMENT '审核人 ID',
     ADD COLUMN review_time DATETIME NULL COMMENT '审核时间';
+-- 添加新列
+ALTER TABLE picture ADD COLUMN like_count INT DEFAULT 0 COMMENT '图片的点赞数';
+-- 添加新列
+ALTER TABLE comment ADD COLUMN like_count INT DEFAULT 0 COMMENT '评论的点赞数';
+-- 添加新列    -- 添加新列
+ALTER TABLE user_like ADD COLUMN is_liked INT DEFAULT 0 COMMENT '0表示未点赞，1表示已点赞';
+-- 添加新列
+ALTER TABLE user_like
+    ADD like_type TINYINT NOT NULL DEFAULT 0 COMMENT '点赞类型，0-图片，1-评论';
+
 
 -- 创建基于 reviewStatus 列的索引
 CREATE INDEX idx_review_status ON picture (review_status);
+
+
 
 
 -- 用户点赞表

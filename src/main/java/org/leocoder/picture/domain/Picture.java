@@ -138,6 +138,13 @@ public class Picture implements Serializable {
     @TableField(value = "like_count")
     private Integer likeCount;
 
+
+    /**
+     * 收藏数量
+     */
+    @TableField(value = "favorite_count")
+    private Integer favoriteCount;
+
     /**
      * 是否删除
      */

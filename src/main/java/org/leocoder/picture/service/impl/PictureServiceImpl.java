@@ -23,6 +23,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.leocoder.picture.domain.Favorite;
 import org.leocoder.picture.domain.Like;
 import org.leocoder.picture.domain.Picture;
 import org.leocoder.picture.domain.User;
@@ -42,6 +43,7 @@ import org.leocoder.picture.manager.upload.FilePictureUpload;
 import org.leocoder.picture.manager.upload.PictureUploadTemplate;
 import org.leocoder.picture.manager.upload.UrlPictureUpload;
 import org.leocoder.picture.mapper.PictureMapper;
+import org.leocoder.picture.service.FavoriteService;
 import org.leocoder.picture.service.LikeService;
 import org.leocoder.picture.service.PictureService;
 import org.leocoder.picture.service.UserService;
@@ -80,6 +82,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     private final UrlPictureUpload urlPictureUpload;
 
     private final LikeService likeService;
+
+    private final FavoriteService favoriteService;
 
     /**
      * 上传图片
@@ -263,6 +267,15 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             Like like = likeService.getOne(Wrappers.lambdaQuery(Like.class)
                     .eq(Like::getPictureId, picture.getId())
                     .eq(Like::getUserId, loginUser.getId()));
+            // 获取图片的收藏状态
+            Favorite favorite = favoriteService.getOne(Wrappers.lambdaQuery(Favorite.class)
+                    .eq(Favorite::getPictureId, picture.getId())
+                    .eq(Favorite::getUserId, loginUser.getId()));
+            if (ObjectUtil.isNotNull(favorite)) {
+                pictureVO.setIsFavorited(favorite.getIsFavorited());
+            }else {
+                pictureVO.setIsFavorited(0);
+            }
             if (ObjectUtil.isNotNull(like)) {
                 pictureVO.setIsLiked(like.getIsLiked());
             }else {

@@ -46,5 +46,11 @@ public class Favorite implements Serializable {
     @TableField(value = "create_time",fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
+    /**
+     * 是否收藏
+     */
+    @TableField(value = "is_favorited")
+    private Integer isFavorited;
+
     private static final long serialVersionUID = 1L;
 }

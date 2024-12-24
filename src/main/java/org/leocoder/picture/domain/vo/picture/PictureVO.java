@@ -125,9 +125,19 @@ public class PictureVO implements Serializable {
     private Integer likeCount;
 
     /**
+     * 收藏数量
+     */
+    private Integer favoriteCount;
+
+    /**
      * 是否点赞
      */
     private Integer isLiked;
+
+    /**
+     * 是否收藏
+     */
+    private Integer isFavorited;
 
     private static final long serialVersionUID = 1L;
 

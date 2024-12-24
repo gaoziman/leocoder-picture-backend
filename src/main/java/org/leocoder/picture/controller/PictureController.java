@@ -211,8 +211,7 @@ public class PictureController {
 
     @ApiOperation(value = "分页获取图片列表（封装类）")
     @PostMapping("/list/page/vo")
-    public Result<Page<PictureVO>> listPictureVOByPage(@RequestBody PictureQueryRequest pictureQueryRequest,
-                                                       HttpServletRequest request) {
+    public Result<Page<PictureVO>> listPictureVOByPage(@RequestBody PictureQueryRequest pictureQueryRequest, HttpServletRequest request) {
         long current = pictureQueryRequest.getPageNum();
         long size = pictureQueryRequest.getPageSize();
         // 限制爬虫

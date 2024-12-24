@@ -29,4 +29,22 @@ public interface PictureMapper extends BaseMapper<Picture> {
      */
     @Update("UPDATE picture SET like_count = like_count - 1 WHERE id = #{pictureId}")
     void decrementLikeCount(@Param("pictureId") Long pictureId);
+
+
+    /**
+     * 增加图片的收藏数
+     *
+     * @param pictureId 图片id
+     */
+    @Update("UPDATE picture SET favorite_count = favorite_count + 1 WHERE id = #{pictureId}")
+    void incrementFavoriteCount(Long pictureId);
+
+
+    /**
+     * 取消图片的收藏
+     *
+     * @param pictureId 图片id
+     */
+    @Update("UPDATE picture SET favorite_count = favorite_count - 1 WHERE id = #{pictureId}")
+    void decrementFavoriteCount(@Param("pictureId") Long pictureId);
 }
