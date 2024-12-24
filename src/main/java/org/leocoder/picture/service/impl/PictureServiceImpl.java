@@ -273,12 +273,12 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
                     .eq(Favorite::getUserId, loginUser.getId()));
             if (ObjectUtil.isNotNull(favorite)) {
                 pictureVO.setIsFavorited(favorite.getIsFavorited());
-            }else {
+            } else {
                 pictureVO.setIsFavorited(0);
             }
             if (ObjectUtil.isNotNull(like)) {
                 pictureVO.setIsLiked(like.getIsLiked());
-            }else {
+            } else {
                 pictureVO.setIsLiked(0);
             }
         }
@@ -398,6 +398,13 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     }
 
 
+    /**
+     * 根据不同的源抓取图片
+     *
+     * @param requestParam 批量抓取请求参数
+     * @param loginUser    登录用户
+     * @return 上传数量
+     */
     @Override
     public Integer uploadPictureByBatch(PictureUploadByBatchRequest requestParam, User loginUser) {
         String searchText = requestParam.getSearchText();
@@ -429,6 +436,15 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     }
 
 
+    /**
+     * 抓取百度图片
+     *
+     * @param searchText 关键字
+     * @param count      数量
+     * @param loginUser  登录用户
+     * @param namePrefix 名称前缀
+     * @return 上传数量
+     */
     public Integer fetchFromBaidu(String searchText, Integer count, User loginUser, String namePrefix) {
         ThrowUtils.throwIf(count > 30, ErrorCode.PARAMS_ERROR, "最多 30 条");
 
@@ -486,6 +502,15 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     }
 
 
+    /**
+     * 抓取必应图片
+     *
+     * @param searchText 关键字
+     * @param count      数量
+     * @param loginUser  登录用户
+     * @param namePrefix 名称前缀
+     * @return 上传数量
+     */
     public Integer fetchFromBing(String searchText, Integer count, User loginUser, String namePrefix) {
         ThrowUtils.throwIf(count > 30, ErrorCode.PARAMS_ERROR, "最多 30 条");
         // 要抓取的地址
@@ -540,6 +565,15 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     }
 
 
+    /**
+     * 抓取谷歌图片
+     *
+     * @param searchText 关键字
+     * @param count      数量
+     * @param loginUser  登录用户
+     * @param namePrefix 名称前缀
+     * @return 上传数量
+     */
     public Integer fetchFromGoogle(String searchText, Integer count, User loginUser, String namePrefix) {
         int uploadCount = 0;
         String apiKey = "AIzaSyBvU3jEggN8AtpNcF14jyty69rFvhLlQWA";
