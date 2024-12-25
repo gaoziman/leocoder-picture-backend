@@ -226,6 +226,24 @@ public class PictureController {
     }
 
 
+    @ApiOperation(value = "分页获取已发布图片列表（封装类）")
+    @PostMapping("/list/page/user")
+    public Result<Page<PictureVO>> listPictureVOByUser(@RequestBody PictureQueryRequest pictureQueryRequest, HttpServletRequest request) {
+        long current = pictureQueryRequest.getPageNum();
+        long size = pictureQueryRequest.getPageSize();
+        // 限制爬虫
+        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
+        // 只能查看已过审的数据
+        pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+        pictureQueryRequest.setUserId(userService.getLoginUser(request).getId());
+        // 查询数据库
+        Page<Picture> picturePage = pictureService.page(new Page<>(current, size),
+                pictureService.getLambdaQueryWrapper(pictureQueryRequest));
+        // 获取封装类
+        return ResultUtils.success(pictureService.getPictureVOPage(picturePage, request));
+    }
+
+
     @ApiOperation(value = "编辑图片（给用户使用）")
     @PostMapping("/edit")
     public Result<Boolean> editPicture(@RequestBody PictureEditRequest pictureEditRequest, HttpServletRequest request) {
