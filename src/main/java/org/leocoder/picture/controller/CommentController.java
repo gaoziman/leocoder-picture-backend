@@ -15,7 +15,6 @@ import org.leocoder.picture.domain.Comment;
 import org.leocoder.picture.domain.User;
 import org.leocoder.picture.domain.dto.comment.CommentAddRequest;
 import org.leocoder.picture.domain.dto.comment.CommentQueryRequest;
-import org.leocoder.picture.domain.dto.like.CancelLikeRequest;
 import org.leocoder.picture.domain.dto.like.LikeRequest;
 import org.leocoder.picture.domain.vo.comment.CommentVO;
 import org.leocoder.picture.exception.ErrorCode;
@@ -117,33 +116,19 @@ public class CommentController {
         return ResultUtils.success(true);
     }
 
-    @ApiOperation(value = "点赞评论")
-    @PostMapping("/like")
-    public Result<Boolean> likeComment(@RequestBody LikeRequest requestParam, HttpServletRequest request) {
+    @ApiOperation(value = "点赞/取消点赞评论")
+    @PostMapping("/toggleLike")
+    public Result<Boolean> toggleLike(@RequestBody LikeRequest requestParam, HttpServletRequest request) {
         // 校验参数
         ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
         Long pictureId = requestParam.getPictureId();
         Integer likeType = requestParam.getLikeType();
+        Boolean isLiked = requestParam.getIsLiked();
         // 获取登录用户
         User loginUser = userService.getLoginUser(request);
         // 传递用户ID和评论ID
-        boolean success = likeService.likePicture(loginUser.getId(), pictureId, likeType);
+        boolean success = likeService.toggleLike(loginUser.getId(), pictureId, likeType,isLiked);
         return ResultUtils.success(success);
     }
-
-    @ApiOperation(value = "取消点赞评论")
-    @PostMapping("/{id}/unlike")
-    public Result<Boolean> unlikeComment(@RequestBody CancelLikeRequest requestParam, HttpServletRequest request) {
-        // 校验参数
-        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
-        Long pictureId = requestParam.getPictureId();
-        Integer likeType = requestParam.getLikeType();
-        // 获取登录用户
-        User loginUser = userService.getLoginUser(request);
-        // 传递用户ID和评论ID
-        boolean success = likeService.cancelLike(loginUser.getId(), pictureId, likeType);
-        return ResultUtils.success(success);
-    }
-
 
 }

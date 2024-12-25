@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.leocoder.picture.domain.Like;
 import org.leocoder.picture.exception.ErrorCode;
 import org.leocoder.picture.exception.ThrowUtils;
+import org.leocoder.picture.mapper.CommentMapper;
 import org.leocoder.picture.mapper.LikeMapper;
 import org.leocoder.picture.mapper.PictureMapper;
 import org.leocoder.picture.service.LikeService;
@@ -34,111 +35,110 @@ public class LikeServiceImpl extends ServiceImpl<LikeMapper, Like> implements Li
 
     private final PictureMapper pictureMapper;
 
+    private final CommentMapper commentMapper;
+
     private final StringRedisTemplate redisTemplate;
 
 
     /**
-     * 点赞图片
+     * 点赞或取消点赞
      *
-     * @param userId    用户id
-     * @param pictureId 图片id
-     * @param likeType  点赞类型  0表示图片 1表示评论
-     * @return true表示点赞成功，false表示点赞失败
+     * @param userId   用户 ID
+     * @param targetId 点赞目标 ID（图片或评论）
+     * @param likeType 点赞类型（0表示图片，1表示评论）
+     * @param isLike   是否点赞
+     * @return true 表示点赞成功，false 表示取消点赞成功
      */
-    @Override
     @Transactional
-    public boolean likePicture(Long userId, Long pictureId,Integer likeType) {
-        // 检查用户是否已经点赞
-        String likeCacheKey = "user:" + userId + ":liked:" + pictureId;
-        log.info("用户[{}]已经点赞过图片[{}]", userId, pictureId);
-        ThrowUtils.throwIf(redisTemplate.hasKey(likeCacheKey), ErrorCode.BUSINESS_ERROR, "用户已经点赞过图片");
+    @Override
+    public boolean toggleLike(Long userId, Long targetId, Integer likeType, boolean isLike) {
+        // 构建 Redis 缓存键
+        String likeCacheKey = "user:" + userId + ":liked:" + targetId + ":type:" + likeType;
+        String likeCountKey = LIKE_COUNT_KEY_PREFIX + targetId + ":type:" + likeType;
 
-        // 插入点赞记录
-        Like userLike = new Like();
-        userLike.setUserId(userId);
-        userLike.setPictureId(pictureId);
-        userLike.setLikeType(likeType);
-        userLike.setIsLiked(1);
-        userLikeMapper.insert(userLike);
+        if (isLike) {
+            // 点赞逻辑
+            ThrowUtils.throwIf(redisTemplate.hasKey(likeCacheKey), ErrorCode.BUSINESS_ERROR, "用户已点赞");
 
-        // 更新图片的点赞数
-        pictureMapper.incrementLikeCount(pictureId);
+            // 插入点赞记录
+            Like userLike = new Like();
+            userLike.setUserId(userId);
+            // 对于评论 targetId 表示评论ID
+            userLike.setPictureId(targetId);
+            userLike.setLikeType(likeType);
+            userLike.setIsLiked(1);
+            userLikeMapper.insert(userLike);
 
-        // 设置 Redis 缓存的过期时间为 1 天，可以根据实际情况调整
-        redisTemplate.opsForValue().set(likeCacheKey, "1", 1, TimeUnit.DAYS);
+            // 更新点赞数
+            updateLikeCount(targetId, likeType, 1);
 
-        // 更新 Redis 缓存，并设置过期时间
-        String likeCountKey = LIKE_COUNT_KEY_PREFIX + pictureId;
-        try {
+            // 设置 Redis 缓存
             redisTemplate.opsForValue().set(likeCacheKey, "1", 1, TimeUnit.DAYS);
-            redisTemplate.opsForValue().increment(likeCountKey, 1);
-        } catch (Exception e) {
-            // 如果 Redis 更新失败，重试机制
-            retryUpdateRedisCache(likeCacheKey, likeCountKey);
+        } else {
+            // 取消点赞逻辑
+            Like userLike = userLikeMapper.findByUserIdAndPictureId(userId, targetId, likeType);
+            ThrowUtils.throwIf(!redisTemplate.hasKey(likeCacheKey) && ObjectUtil.isNull(userLike),
+                    ErrorCode.BUSINESS_ERROR, "用户未点赞，无法取消");
+
+            // 删除点赞记录
+            userLikeMapper.deleteByUserIdAndPictureId(userId, targetId, likeType);
+
+            // 更新点赞数
+            updateLikeCount(targetId, likeType, -1);
+
+            // 删除 Redis 缓存
+            redisTemplate.delete(likeCacheKey);
         }
 
         return true;
     }
 
-
     /**
-     * 取消点赞图片
+     * 更新点赞数
      *
-     * @param userId    用户id
-     * @param pictureId 图片id
-     * @param likeType  取消点赞类型  0表示图片 1表示评论
-     * @return true表示取消成功，false表示取消失败
+     * @param targetId 点赞目标ID（图片或评论）
+     * @param likeType 点赞类型（0表示图片，1表示评论）
+     * @param delta    增量（1表示增加，-1表示减少）
      */
-    @Override
-    @Transactional
-    public boolean cancelLike(Long userId, Long pictureId,Integer likeType) {
-        // 检查用户是否点赞过
-        String likeCacheKey = "user:" + userId + ":liked:" + pictureId;
+    private void updateLikeCount(Long targetId, Integer likeType, int delta) {
+        // 根据类型更新数据库
+        if (likeType == 0) {
+            pictureMapper.updatePictureLikeCount(targetId, delta);
+        } else if (likeType == 1) {
+            // 如果是评论，可以实现类似 commentMapper.incrementLikeCount()
+            // 这里假设有一个对应的 commentMapper
+            commentMapper.updateCommentLikeCount(targetId, delta);
+        }
 
-        Like userLike = userLikeMapper.findByUserIdAndPictureId(userId, pictureId,likeType);
-
-        ThrowUtils.throwIf(!redisTemplate.hasKey(likeCacheKey) && ObjectUtil.isNull(userLike), ErrorCode.BUSINESS_ERROR, " 用户未点赞，无法取消");
-
-        // 删除点赞记录
-        userLikeMapper.deleteByUserIdAndPictureId(userId, pictureId,likeType);
-
-        // 更新图片的点赞数
-        pictureMapper.decrementLikeCount(pictureId);
-
-        // 删除 Redis 缓存中的点赞状态
-        redisTemplate.delete(likeCacheKey);
-
-        // 更新 Redis 中的点赞数
-        String likeCountKey = LIKE_COUNT_KEY_PREFIX + pictureId;
-        redisTemplate.opsForValue().increment(likeCountKey, -1);
-
-        return true;
+        // 更新 Redis 缓存
+        String likeCountKey = LIKE_COUNT_KEY_PREFIX + targetId + ":type:" + likeType;
+        try {
+            redisTemplate.opsForValue().increment(likeCountKey, delta);
+        } catch (Exception e) {
+            retryUpdateRedisCache(likeCountKey, delta);
+        }
     }
 
     /**
-     * 更新 Redis 缓存，并设置过期时间
+     * 重试更新 Redis 缓存
      *
-     * @param likeCacheKey 点赞缓存 key
      * @param likeCountKey 点赞数缓存 key
+     * @param delta        增量
      */
-    private void retryUpdateRedisCache(String likeCacheKey, String likeCountKey) {
-        // 尝试重试，最多重试 3 次
+    private void retryUpdateRedisCache(String likeCountKey, int delta) {
         int retryCount = 0;
         boolean success = false;
         while (retryCount < 3 && !success) {
             try {
-                // 尝试更新 Redis 缓存
-                redisTemplate.opsForValue().set(likeCacheKey, "1", 1, TimeUnit.DAYS);
-                redisTemplate.opsForValue().increment(likeCountKey, 1);
+                redisTemplate.opsForValue().increment(likeCountKey, delta);
                 success = true;
             } catch (Exception e) {
                 retryCount++;
                 if (retryCount == 3) {
-                    log.error("更新 Redis 缓存失败，已尝试3次，执行失败", e);
+                    log.error("更新 Redis 缓存失败，已尝试3次", e);
                     throw new RuntimeException("Redis 更新失败");
                 }
                 try {
-                    // 延迟重试，避免频繁操作
                     TimeUnit.SECONDS.sleep(2);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();

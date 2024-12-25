@@ -21,4 +21,9 @@ public class LikeRequest {
      * 点赞类型
      */
     private Integer likeType;
+
+    /**
+     * 是否点赞
+     */
+    private Boolean isLiked;
 }

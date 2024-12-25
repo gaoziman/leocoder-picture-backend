@@ -2,6 +2,7 @@ package org.leocoder.picture.service;
 
 import org.leocoder.picture.domain.Like;
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * @author : 程序员Leo
@@ -14,23 +15,14 @@ public interface LikeService extends IService<Like> {
 
 
     /**
-     * 点赞图片
+     * 点赞或取消点赞
      *
-     * @param userId    用户id
-     * @param pictureId 图片id
-     * @param likeType  点赞类型  0表示图片 1表示评论
-     * @return true表示点赞成功，false表示点赞失败
+     * @param userId   用户 ID
+     * @param targetId 点赞目标 ID（图片或评论）
+     * @param likeType 点赞类型（0表示图片，1表示评论）
+     * @param isLike   是否点赞
+     * @return true 表示点赞成功，false 表示取消点赞成功
      */
-    boolean likePicture(Long userId, Long pictureId, Integer likeType);
-
-
-    /**
-     * 取消点赞图片
-     *
-     * @param userId    用户id
-     * @param pictureId 图片id
-     * @param likeType  取消点赞类型  0表示图片 1表示评论
-     * @return true表示取消成功，false表示取消失败
-     */
-    boolean cancelLike(Long userId, Long pictureId, Integer likeType);
+    @Transactional
+    boolean toggleLike(Long userId, Long targetId, Integer likeType, boolean isLike);
 }

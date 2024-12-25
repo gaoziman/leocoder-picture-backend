@@ -2,6 +2,7 @@ package org.leocoder.picture.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.leocoder.picture.domain.Picture;
 
@@ -47,4 +48,12 @@ public interface PictureMapper extends BaseMapper<Picture> {
      */
     @Update("UPDATE picture SET favorite_count = favorite_count - 1 WHERE id = #{pictureId}")
     void decrementFavoriteCount(@Param("pictureId") Long pictureId);
+
+    @Update("UPDATE picture SET like_count = like_count + #{delta} WHERE id = #{pictureId}")
+    void updatePictureLikeCount(@Param("pictureId") Long pictureId, @Param("delta") int delta);
+
+    @Select("SELECT user_id FROM picture WHERE id = #{pictureId}")
+    Long selectAuthorIdByPictureId(@Param("pictureId")String pictureId);
+
+
 }

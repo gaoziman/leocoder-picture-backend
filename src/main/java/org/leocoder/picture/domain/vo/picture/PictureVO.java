@@ -120,7 +120,7 @@ public class PictureVO implements Serializable {
     private UserVO user;
 
     /**
-     * 点赞数
+     * 图片点赞数
      */
     private Integer likeCount;
 
@@ -130,7 +130,7 @@ public class PictureVO implements Serializable {
     private Integer favoriteCount;
 
     /**
-     * 是否点赞
+     * 图片是否点赞
      */
     private Integer isLiked;
 

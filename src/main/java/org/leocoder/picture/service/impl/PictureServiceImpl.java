@@ -197,9 +197,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         Long reviewerId = requestParam.getReviewerId();
         String reviewMessage = requestParam.getReviewMessage();
         Integer reviewStatus = requestParam.getReviewStatus();
-        // Long viewCount = requestParam.getViewCount();
-        // Long likeCount = requestParam.getLikeCount();
-        // Long favoriteCount = requestParam.getFavoriteCount();
 
         LambdaQueryWrapper<Picture> lambdaQueryWrapper = Wrappers.lambdaQuery(Picture.class);
 
@@ -287,20 +284,23 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             UserVO userVO = userService.getUserVO(user);
             pictureVO.setUser(userVO);
             // 查询图片的点赞状态
-            Like like = likeService.getOne(Wrappers.lambdaQuery(Like.class)
+            Like pictureLike = likeService.getOne(Wrappers.lambdaQuery(Like.class)
                     .eq(Like::getPictureId, picture.getId())
-                    .eq(Like::getUserId, loginUser.getId()));
+                    .eq(Like::getUserId, loginUser.getId())
+                    .eq(Like::getLikeType, 0));
             // 获取图片的收藏状态
             Favorite favorite = favoriteService.getOne(Wrappers.lambdaQuery(Favorite.class)
                     .eq(Favorite::getPictureId, picture.getId())
                     .eq(Favorite::getUserId, loginUser.getId()));
+            // 填充点赞状态
             if (ObjectUtil.isNotNull(favorite)) {
                 pictureVO.setIsFavorited(favorite.getIsFavorited());
             } else {
                 pictureVO.setIsFavorited(0);
             }
-            if (ObjectUtil.isNotNull(like)) {
-                pictureVO.setIsLiked(like.getIsLiked());
+            // 填充图片点赞状态
+            if (ObjectUtil.isNotNull(pictureLike)) {
+                pictureVO.setIsLiked(pictureLike.getIsLiked());
             } else {
                 pictureVO.setIsLiked(0);
             }

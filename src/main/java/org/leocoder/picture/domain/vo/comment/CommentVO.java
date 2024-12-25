@@ -18,12 +18,19 @@ public class CommentVO {
     private Long id;
     private Long pictureId;
     private Long userId;
+    private String userName;
+    private String userAvatar;
+    private String parentUserName;
     private Long parentId;
     private String content;
     private Integer likeCount;
     private LocalDateTime createTime;
     // 当前用户是否点赞该评论
     private boolean isLiked;
+    // 当前用户是否是作者
+    private boolean isAuthor;
+    // 评论数量
+    private Integer commentCount;
     // 子评论
     private List<CommentVO> children;
 
@@ -36,5 +43,6 @@ public class CommentVO {
         this.likeCount = comment.getLikeCount();
         this.createTime = comment.getCreateTime();
         this.children = new ArrayList<>();
+        this.commentCount = 0;
     }
 }
