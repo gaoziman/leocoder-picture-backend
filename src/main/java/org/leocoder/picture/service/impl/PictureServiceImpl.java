@@ -48,6 +48,7 @@ import org.leocoder.picture.service.LikeService;
 import org.leocoder.picture.service.PictureService;
 import org.leocoder.picture.service.UserService;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletRequest;
@@ -84,6 +85,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     private final LikeService likeService;
 
     private final FavoriteService favoriteService;
+
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * 上传图片
@@ -194,6 +197,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         Long reviewerId = requestParam.getReviewerId();
         String reviewMessage = requestParam.getReviewMessage();
         Integer reviewStatus = requestParam.getReviewStatus();
+        // Long viewCount = requestParam.getViewCount();
+        // Long likeCount = requestParam.getLikeCount();
+        // Long favoriteCount = requestParam.getFavoriteCount();
 
         LambdaQueryWrapper<Picture> lambdaQueryWrapper = Wrappers.lambdaQuery(Picture.class);
 
@@ -220,15 +226,32 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         lambdaQueryWrapper.eq(ObjUtil.isNotEmpty(picScale), Picture::getPicScale, picScale);
         lambdaQueryWrapper.eq(ObjUtil.isNotEmpty(reviewerId), Picture::getReviewerId, reviewerId);
         lambdaQueryWrapper.eq(ObjUtil.isNotEmpty(reviewStatus), Picture::getReviewStatus, reviewStatus);
+
         // 排序 - 按照创建时间降序
+        // 排序处理
         if (StrUtil.isNotBlank(sortField)) {
             boolean isAsc = "ascend".equalsIgnoreCase(sortOrder);
-            lambdaQueryWrapper.orderBy(true, isAsc, Picture::getCreateTime);
+
+            // 根据 sortField 动态排序
+            switch (sortField) {
+                case "viewCount":
+                    lambdaQueryWrapper.orderBy(true, isAsc, Picture::getViewCount);
+                    break;
+                case "likeCount":
+                    lambdaQueryWrapper.orderBy(true, isAsc, Picture::getLikeCount);
+                    break;
+                case "favoriteCount":
+                    lambdaQueryWrapper.orderBy(true, isAsc, Picture::getFavoriteCount);
+                    break;
+                case "createTime":
+                default:
+                    lambdaQueryWrapper.orderBy(true, isAsc, Picture::getCreateTime);
+                    break;
+            }
         } else {
             // 默认按照创建时间降序排序
             lambdaQueryWrapper.orderByDesc(Picture::getCreateTime);
         }
-
         // JSON 数组查询（标签）
         if (ObjUtil.isNotEmpty(tags)) {
             for (String tag : tags) {
@@ -237,9 +260,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         }
 
         // 排序
-        lambdaQueryWrapper.orderBy(ObjUtil.isNotEmpty(sortField),
-                "ascend".equals(sortOrder),
-                sortField != null ? Picture::getName : Picture::getId);
+        // lambdaQueryWrapper.orderBy(ObjUtil.isNotEmpty(sortField),
+        //         "ascend".equals(sortOrder),
+        //         sortField != null ? Picture::getName : Picture::getId);
 
         return lambdaQueryWrapper;
     }
@@ -627,5 +650,83 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         }
 
         return uploadCount;
+    }
+
+
+    /**
+     * 获取图片浏览次数
+     *
+     * @param pictureId 图片ID
+     * @return 当前图片的浏览次数
+     */
+    @Override
+    public Long getViewCount(Long pictureId) {
+        String key = "picture:view_count:" + pictureId;
+        // 从 Redis 获取浏览次数
+        String viewCountStr = redisTemplate.opsForValue().get(key);
+
+        if (StrUtil.isNotBlank(viewCountStr)) {
+            return Long.parseLong(viewCountStr);
+        }
+
+        // 如果 Redis 中没有，则从数据库获取并同步到 Redis
+        Picture picture = this.getById(pictureId);
+        if (ObjectUtil.isNotNull(picture)) {
+            Long viewCount = picture.getViewCount() != null ? picture.getViewCount() : 0L;
+
+            // 将数据库的值同步到 Redis，确保不会丢失数据
+            redisTemplate.opsForValue().set(key, String.valueOf(viewCount));
+            return viewCount;
+        }
+
+        // 若数据库中也不存在对应图片，返回 0
+        return 0L;
+    }
+
+
+
+    /**
+     * 增加图片浏览次数
+     *
+     * @param pictureId 图片ID
+     */
+    @Override
+    public void incrementViewCount(Long pictureId) {
+        Picture picture = this.getById(pictureId);
+        if (ObjectUtil.isNotNull(picture)) {
+            picture.setViewCount(picture.getViewCount() + 1);
+            this.updateById(picture);
+        }
+    }
+
+
+    /**
+     * 增加图片浏览次数，缓存版本
+     *
+     * @param pictureId 图片ID
+     */
+    @Override
+    public void incrementViewCountInCache(Long pictureId) {
+        String key = "picture:view_count:" + pictureId;
+        // 判断Redis中是否存在该键
+        Boolean hasKey = redisTemplate.hasKey(key);
+
+        if (Boolean.TRUE.equals(hasKey)) {
+            // 如果存在，直接增加浏览量
+            redisTemplate.opsForValue().increment(key, 1);
+
+            // 同时更新数据库
+            Picture picture = this.getById(pictureId);
+            if (ObjectUtil.isNotNull(picture)) {
+                picture.setViewCount(picture.getViewCount() + 1);
+                this.updateById(picture);
+            }
+        } else {
+            // 如果不存在，从数据库加载浏览量并写入Redis
+            Picture picture = this.getById(pictureId);
+            Long currentViewCount = picture != null && picture.getViewCount() != null ? picture.getViewCount() : 0L;
+            // 将数据库中的浏览量同步到Redis
+            redisTemplate.opsForValue().set(key, String.valueOf(currentViewCount + 1));
+        }
     }
 }

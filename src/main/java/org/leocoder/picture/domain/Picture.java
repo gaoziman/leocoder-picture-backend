@@ -146,6 +146,12 @@ public class Picture implements Serializable {
     private Integer favoriteCount;
 
     /**
+     * 浏览数量
+     */
+    @TableField(value = "view_count")
+    private Long viewCount;
+
+    /**
      * 是否删除
      */
     @TableField(value = "is_delete")

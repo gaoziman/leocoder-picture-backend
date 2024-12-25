@@ -95,4 +95,27 @@ public interface PictureService extends IService<Picture> {
      */
     Integer uploadPictureByBatch(PictureUploadByBatchRequest requestParam, User loginUser);
 
+
+    /**
+     * 获取图片浏览次数
+     *
+     * @param pictureId 图片ID
+     * @return 当前图片的浏览次数
+     */
+    Long getViewCount(Long pictureId);
+
+    /**
+     * 增加图片浏览次数
+     *
+     * @param pictureId 图片ID
+     */
+    void incrementViewCount(Long pictureId);
+
+
+    /**
+     * 增加图片浏览次数，缓存版本
+     *
+     * @param pictureId 图片ID
+     */
+    void incrementViewCountInCache(Long pictureId);
 }

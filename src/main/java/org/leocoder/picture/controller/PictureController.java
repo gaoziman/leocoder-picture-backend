@@ -2,6 +2,7 @@ package org.leocoder.picture.controller;
 
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.annotations.Api;
@@ -54,8 +55,6 @@ public class PictureController {
     private final LikeService likeService;
 
 
-
-
     @ApiOperation(value = "上传图片（可重新上传）")
     @PostMapping("/upload")
     // @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
@@ -82,7 +81,6 @@ public class PictureController {
     }
 
 
-
     @ApiOperation(value = "删除图片")
     @PostMapping("/delete")
     @Transactional
@@ -94,7 +92,7 @@ public class PictureController {
         long id = deleteRequest.getId();
         // 判断是否存在
         Picture oldPicture = pictureService.getById(id);
-        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(ObjectUtil.isNull(oldPicture), ErrorCode.NOT_FOUND_ERROR);
         // 仅本人或管理员可删除
         if (!oldPicture.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
@@ -121,7 +119,7 @@ public class PictureController {
         }
         User loginUser = userService.getLoginUser(request);
         // 仅管理员可删除
-        if ( !userService.isAdmin(loginUser)) {
+        if (!userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         // 获取要删除的图片ID列表
@@ -141,12 +139,10 @@ public class PictureController {
     }
 
 
-
-
     @ApiOperation(value = "更新图片（仅管理员可用）")
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public Result<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest , HttpServletRequest request) {
+    public Result<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest, HttpServletRequest request) {
         if (pictureUpdateRequest == null || pictureUpdateRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -160,7 +156,7 @@ public class PictureController {
         // 判断是否存在
         long id = pictureUpdateRequest.getId();
         Picture oldPicture = pictureService.getById(id);
-        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(ObjectUtil.isNull(oldPicture), ErrorCode.NOT_FOUND_ERROR);
         // 补充审核参数
         User loginUser = userService.getLoginUser(request);
         pictureService.fillReviewParams(picture, loginUser);
@@ -178,21 +174,60 @@ public class PictureController {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         // 查询数据库
         Picture picture = pictureService.getById(id);
-        ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(ObjectUtil.isNull(picture), ErrorCode.NOT_FOUND_ERROR);
         // 获取封装类
         return ResultUtils.success(picture);
     }
 
 
+    @ApiOperation(value = "分页获取图片列表（按热度排序）")
+    @PostMapping("/list/page/popular")
+    public Result<Page<PictureVO>> listPopularPictures(@RequestBody PictureQueryRequest pictureQueryRequest, HttpServletRequest request) {
+        long current = pictureQueryRequest.getPageNum();
+        long size = pictureQueryRequest.getPageSize();
+        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
+
+        // 按浏览次数降序排序
+        LambdaQueryWrapper<Picture> queryWrapper = pictureService.getLambdaQueryWrapper(pictureQueryRequest)
+                .orderByDesc(Picture::getViewCount);
+        Page<Picture> picturePage = pictureService.page(new Page<>(current, size), queryWrapper);
+
+        // 获取封装类
+        return ResultUtils.success(pictureService.getPictureVOPage(picturePage, request));
+    }
+
+
     @ApiOperation(value = "根据 id 获取图片（封装类）")
     @GetMapping("/get/vo")
-    public Result<PictureVO> getPictureVOById(long id, HttpServletRequest request) {
+    public Result<PictureVO> getPictureVOById(Long id, HttpServletRequest request) {
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
-        // 查询数据库
+
+        // 查询数据库中的图片信息
         Picture picture = pictureService.getById(id);
-        ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(ObjectUtil.isNull(picture), ErrorCode.NOT_FOUND_ERROR);
+
+        // 如果图片为待审核状态，直接返回数据，不增加浏览次数
+        if (PictureReviewStatusEnum.REVIEWING.getValue() == picture.getReviewStatus()) {
+            return ResultUtils.success(pictureService.getPictureVO(picture, request));
+        }
+
+        // 增加浏览次数
+        pictureService.incrementViewCountInCache(id);
+
+        // 获取最新的浏览量
+        Long viewCount = pictureService.getViewCount(id);
+        // 更新浏览量
+        picture.setViewCount(viewCount);
+
         // 获取封装类
         return ResultUtils.success(pictureService.getPictureVO(picture, request));
+    }
+
+    @ApiOperation(value = "获取图片浏览次数（Redis实时的数据）")
+    @GetMapping("/{id}/viewCount")
+    public Result<Long> getPictureViewCount(@PathVariable Long id) {
+        Long viewCount = pictureService.getViewCount(id);
+        return ResultUtils.success(viewCount);
     }
 
 
@@ -263,7 +298,7 @@ public class PictureController {
         // 判断是否存在
         long id = pictureEditRequest.getId();
         Picture oldPicture = pictureService.getById(id);
-        ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR);
+        ThrowUtils.throwIf(ObjectUtil.isNull(oldPicture), ErrorCode.NOT_FOUND_ERROR);
         // 仅本人或管理员可编辑
         if (!oldPicture.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
@@ -280,8 +315,8 @@ public class PictureController {
     @ApiOperation(value = "初始化标签分类")
     public Result<PictureTagCategory> listPictureTagCategory() {
         PictureTagCategory pictureTagCategory = new PictureTagCategory();
-        List<String> tagList = Arrays.asList("热门", "头像","搞笑", "生活", "高清", "艺术", "校园", "风景", "简历", "创意", "资料","临时");
-        List<String> categoryList = Arrays.asList("个人","模板", "星球","面试题", "表情包", "素材", "学习", "Bugs" , "动物", "海报");
+        List<String> tagList = Arrays.asList("热门", "头像", "搞笑", "生活", "高清", "艺术", "校园", "风景", "简历", "创意", "资料", "临时");
+        List<String> categoryList = Arrays.asList("个人", "模板", "星球", "面试题", "表情包", "素材", "学习", "Bugs", "动物", "海报");
         pictureTagCategory.setTagList(tagList);
         pictureTagCategory.setCategoryList(categoryList);
         return ResultUtils.success(pictureTagCategory);
@@ -292,7 +327,7 @@ public class PictureController {
     @ApiOperation(value = "审核图片")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public Result<Boolean> doPictureReview(@RequestBody PictureReviewRequest requestParam,
-                                                 HttpServletRequest request) {
+                                           HttpServletRequest request) {
         ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(request);
         pictureService.doPictureReview(requestParam, loginUser);

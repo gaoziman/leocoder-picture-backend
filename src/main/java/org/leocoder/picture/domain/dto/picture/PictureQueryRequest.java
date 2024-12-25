@@ -92,6 +92,23 @@ public class PictureQueryRequest extends PageRequest implements Serializable {
      */
     private Long reviewerId;
 
+    /**
+     * 访问量
+     */
+    private Long viewCount;
+
+    /**
+     * 点赞量
+     */
+    private Long likeCount;
+
+    /**
+     * 收藏量
+     */
+    private Long favoriteCount;
+
+
+
     private static final long serialVersionUID = 1L;
 }
 
