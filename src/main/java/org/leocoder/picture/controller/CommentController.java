@@ -105,14 +105,22 @@ public class CommentController {
 
 
     @ApiOperation(value = "删除评论")
-    @PostMapping("/delete}")
-    public Result<Boolean> deleteComment(@PathVariable DeleteRequest requestParam) {
+    @PostMapping("/delete")
+    public Result<Boolean> deleteComment(@RequestBody DeleteRequest requestParam) {
         Long id = requestParam.getId();
+
+        // 删除当前评论
         boolean result = commentService.removeById(id);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "删除失败");
-        // 连带删除子评论
-        boolean removed = commentService.remove(new QueryWrapper<Comment>().eq("parent_id", id));
-        ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR);
+
+        // 检查是否有子评论
+        Long childCount = commentService.count(new QueryWrapper<Comment>().eq("parent_id", id));
+        if (childCount > 0) {
+            // 有子评论才去删除
+            boolean removed = commentService.remove(new QueryWrapper<Comment>().eq("parent_id", id));
+            ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR, "子评论删除失败");
+        }
+
         return ResultUtils.success(true);
     }
 
