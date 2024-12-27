@@ -43,19 +43,13 @@ import org.leocoder.picture.manager.upload.FilePictureUpload;
 import org.leocoder.picture.manager.upload.PictureUploadTemplate;
 import org.leocoder.picture.manager.upload.UrlPictureUpload;
 import org.leocoder.picture.mapper.PictureMapper;
-import org.leocoder.picture.service.FavoriteService;
-import org.leocoder.picture.service.LikeService;
-import org.leocoder.picture.service.PictureService;
-import org.leocoder.picture.service.UserService;
+import org.leocoder.picture.service.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +81,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     private final FavoriteService favoriteService;
 
     private final StringRedisTemplate redisTemplate;
+
+    private final FetchedImagesService fetchedImagesService;
 
     /**
      * 上传图片
@@ -442,12 +438,18 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
         try {
             if ("baidu".equalsIgnoreCase(source)) {
-                uploadCount = fetchFromBaidu(searchText, count, loginUser, namePrefix);
+                uploadCount = fetchFromBaidu(searchText, count, loginUser, namePrefix,source);
             } else if ("google".equalsIgnoreCase(source)) {
-                uploadCount = fetchFromGoogle(searchText, count, loginUser, namePrefix);
+                uploadCount = fetchFromGoogle(searchText, count, loginUser, namePrefix,source);
             } else if ("bing".equalsIgnoreCase(source)) {
-                uploadCount = fetchFromBing(searchText, count, loginUser, namePrefix);
-            } else {
+                uploadCount = fetchFromBing(searchText, count, loginUser, namePrefix,source);
+            } else if ("pexels".equalsIgnoreCase(source)) {
+                uploadCount = fetchFromPexels(searchText, count, loginUser, namePrefix,source);
+            } else if ("wallhaven".equalsIgnoreCase(source)) {
+                uploadCount = fetchFromWallhaven(searchText, count, loginUser, namePrefix,source);
+            } else if ("haowallpaper".equalsIgnoreCase(source)) {
+                uploadCount = fetchFromHaoWallpaper(searchText, count, loginUser, namePrefix,source);
+            }else {
                 throw new BusinessException(ErrorCode.PARAMS_ERROR, "未知的抓取源：" + source);
             }
         } catch (Exception e) {
@@ -468,57 +470,93 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
      * @param namePrefix 名称前缀
      * @return 上传数量
      */
-    public Integer fetchFromBaidu(String searchText, Integer count, User loginUser, String namePrefix) {
-        ThrowUtils.throwIf(count > 30, ErrorCode.PARAMS_ERROR, "最多 30 条");
-
-        String fetchUrl = String.format("https://images.baidu.com/search/acjson?tn=resultjson_com&word=%s", searchText);
+    public Integer fetchFromBaidu(String searchText, Integer count, User loginUser, String namePrefix, String source) {
         int uploadCount = 0;
+        String fetchUrl = String.format("https://images.baidu.com/search/acjson?tn=resultjson_com&word=%s&rn=30", searchText);
+
+        // 获取已抓取的 URL 列表
+        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
 
         try {
-            // 发送 HTTP 请求获取 JSON 数据
-            URL url = new URL(fetchUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Content-Type", "application/json");
-            InputStreamReader reader = new InputStreamReader(connection.getInputStream(), "UTF-8");
+            int page = 0; // 页数从0开始
+            while (uploadCount < count) {
+                // 分页参数 `pn` 是从 0 开始，表示第几条图片
+                String pagedUrl = fetchUrl + "&pn=" + (page * 30);
+                log.info("Fetching URL: {}", pagedUrl);
 
-            // 使用 Gson 解析 JSON 数据
-            JsonObject jsonResponse = JsonParser.parseReader(reader).getAsJsonObject();
-            JsonArray imgArray = jsonResponse.getAsJsonArray("data");
+                // 获取 HTML 页面
+                Document document = Jsoup.connect(pagedUrl).ignoreContentType(true).get();
 
-            for (JsonElement element : imgArray) {
-                if (element.isJsonObject()) {
-                    JsonObject imgObject = element.getAsJsonObject();
-                    String fileUrl = imgObject.get("thumbURL") != null ? imgObject.get("thumbURL").getAsString() : null;
-                    if (StrUtil.isBlank(fileUrl)) {
-                        continue; // 跳过空链接
+                // 解析 JSON 数据
+                JsonObject jsonResponse = JsonParser.parseString(document.text()).getAsJsonObject();
+                JsonArray imgArray = jsonResponse.getAsJsonArray("data");
+
+                if (imgArray == null || imgArray.isEmpty()) {
+                    log.warn("未找到更多图片，停止抓取");
+                    break;
+                }
+
+                for (JsonElement element : imgArray) {
+                    // 跳过无效数据
+                    if (!element.isJsonObject()) {
+                        continue;
                     }
 
+                    JsonObject imgObject = element.getAsJsonObject();
+                    String fileUrl = imgObject.has("thumbURL") ? imgObject.get("thumbURL").getAsString() : null;
+
+                    if (StrUtil.isBlank(fileUrl)) {
+                        log.warn("图片链接为空，跳过");
+                        continue;
+                    }
+
+                    // 检查是否已抓取过
+                    if (fetchedUrls.contains(fileUrl)) {
+                        log.info("图片已抓取过，跳过: {}", fileUrl);
+                        continue;
+                    }
+
+                    // 检查文件大小
+                    try {
+                        long fileSize = getFileSize(fileUrl);
+                        if (fileSize > 4 * 1024 * 1024) {
+                            log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
+                            continue;
+                        }
+                    } catch (IOException e) {
+                        log.warn("获取文件大小失败，跳过: {}", fileUrl, e);
+                        continue;
+                    }
+
+                    // 设置图片名称
                     if (StrUtil.isBlank(namePrefix)) {
                         namePrefix = searchText;
                     }
-
-                    // 上传图片
                     PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
                     pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
 
+                    // 上传图片
                     try {
                         PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
                         log.info("图片上传成功, id = {}", pictureVO.getId());
                         uploadCount++;
+                        fetchedImagesService.saveFetchedUrl(fileUrl, source);
                     } catch (Exception e) {
                         log.error("图片上传失败", e);
                         continue;
                     }
 
+                    // 如果达到抓取数量，停止
                     if (uploadCount >= count) {
                         break;
                     }
                 }
+
+                page++; // 下一页
             }
         } catch (Exception e) {
-            log.error("批量抓取图片失败", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取图片失败");
+            log.error("批量抓取 Baidu 图片失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取 Baidu 图片失败");
         }
 
         return uploadCount;
@@ -534,10 +572,12 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
      * @param namePrefix 名称前缀
      * @return 上传数量
      */
-    public Integer fetchFromBing(String searchText, Integer count, User loginUser, String namePrefix) {
+    public Integer fetchFromBing(String searchText, Integer count, User loginUser, String namePrefix, String source) {
         ThrowUtils.throwIf(count > 30, ErrorCode.PARAMS_ERROR, "最多 30 条");
         // 要抓取的地址
         String fetchUrl = String.format("https://cn.bing.com/images/async?q=%s&mmasync=1", searchText);
+        // 获取已抓取的 URL 列表
+        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
 
         Document document;
         try {
@@ -558,6 +598,12 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
                 log.info("当前链接为空，已跳过: {}", fileUrl);
                 continue;
             }
+            if (fetchedUrls.contains(fileUrl)) {
+                log.info("图片已抓取过，跳过: {}", fileUrl);
+                continue;
+            }
+
+
             // 处理图片上传地址，防止出现转义问题
             int questionMarkIndex = fileUrl.indexOf("?");
             if (questionMarkIndex > -1) {
@@ -576,6 +622,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
                 PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
                 log.info("图片上传成功, id = {}", pictureVO.getId());
                 uploadCount++;
+                fetchedImagesService.saveFetchedUrl(fileUrl, source);
             } catch (Exception e) {
                 log.error("图片上传失败", e);
                 continue;
@@ -597,59 +644,401 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
      * @param namePrefix 名称前缀
      * @return 上传数量
      */
-    public Integer fetchFromGoogle(String searchText, Integer count, User loginUser, String namePrefix) {
+    public Integer fetchFromGoogle(String searchText, Integer count, User loginUser, String namePrefix, String source) {
         int uploadCount = 0;
         String apiKey = "AIzaSyBvU3jEggN8AtpNcF14jyty69rFvhLlQWA";
         String cx = "f112f91a23b674acc";
 
-        // 构建 API 请求 URL
-        String apiUrl = String.format("https://www.googleapis.com/customsearch/v1?q=%s&num=%d&searchType=image&key=%s&cx=%s",
-                searchText, count, apiKey, cx);
+        // 构建 API 基础请求 URL
+        String apiUrl = String.format(
+                "https://www.googleapis.com/customsearch/v1?q=%s&num=10&searchType=image&key=%s&cx=%s",
+                searchText, apiKey, cx);
+
+        // 获取已抓取的 URL 列表
+        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
 
         OkHttpClient client = new OkHttpClient();
 
         try {
-            Request request = new Request.Builder().url(apiUrl).build();
-            Response response = client.newCall(request).execute();
+            int page = 1;
+            while (uploadCount < count) {
+                // 根据页码计算起始索引 (Google API 的 start 参数从 1 开始)
+                String pagedUrl = apiUrl + "&start=" + ((page - 1) * 10 + 1);
+                log.info("Fetching URL: {}", pagedUrl);
 
-            if (!response.isSuccessful()) {
-                throw new BusinessException(ErrorCode.OPERATION_ERROR, "API 调用失败");
-            }
+                // 构建请求
+                Request request = new Request.Builder().url(pagedUrl).build();
+                Response response = client.newCall(request).execute();
 
-            String responseBody = response.body().string();
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode items = objectMapper.readTree(responseBody).get("items");
-
-            for (JsonNode item : items) {
-                String fileUrl = item.get("link").asText();
-
-                if (StrUtil.isBlank(namePrefix)) {
-                    namePrefix = searchText;
+                if (!response.isSuccessful()) {
+                    throw new BusinessException(ErrorCode.OPERATION_ERROR, "Google API 调用失败");
                 }
 
-                // 上传图片
-                PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
-                pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+                // 解析响应
+                String responseBody = response.body().string();
+                ObjectMapper objectMapper = new ObjectMapper();
+                JsonNode items = objectMapper.readTree(responseBody).get("items");
 
-                try {
-                    PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
-                    log.info("图片上传成功, id = {}", pictureVO.getId());
-                    uploadCount++;
-                } catch (Exception e) {
-                    log.error("图片上传失败", e);
-                    continue;
-                }
-
-                if (uploadCount >= count) {
+                // 检查是否有更多图片
+                if (items == null || items.isEmpty()) {
+                    log.warn("未找到更多图片，停止抓取");
                     break;
                 }
+
+                for (JsonNode item : items) {
+                    String fileUrl = item.get("link").asText();
+
+                    // 检查是否已抓取过
+                    if (fetchedUrls.contains(fileUrl)) {
+                        log.info("图片已抓取过，跳过: {}", fileUrl);
+                        continue;
+                    }
+
+                    // 设置名称前缀
+                    if (StrUtil.isBlank(namePrefix)) {
+                        namePrefix = searchText;
+                    }
+
+                    // 检查文件大小
+                    try {
+                        long fileSize = getFileSize(fileUrl);
+                        if (fileSize > 4 * 1024 * 1024) {
+                            log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
+                            continue;
+                        }
+                    } catch (IOException e) {
+                        log.warn("无法获取文件大小，跳过: {}", fileUrl, e);
+                        continue;
+                    }
+
+                    // 上传图片
+                    PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+                    pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+
+                    try {
+                        PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+                        log.info("图片上传成功, id = {}", pictureVO.getId());
+                        uploadCount++;
+
+                        // 保存已抓取的 URL 到数据库
+                        fetchedImagesService.saveFetchedUrl(fileUrl, source);
+                    } catch (Exception e) {
+                        log.error("图片上传失败: {}", fileUrl, e);
+                    }
+
+                    // 如果达到抓取数量，停止
+                    if (uploadCount >= count) {
+                        break;
+                    }
+                }
+                page++; // 下一页
             }
         } catch (Exception e) {
-            log.error("批量抓取谷歌图片失败", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取谷歌图片失败");
+            log.error("批量抓取 Google 图片失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取 Google 图片失败");
         }
 
         return uploadCount;
+    }
+
+
+    /**
+     * 抓取 Pexels 图片
+     *
+     * @param searchText 关键字
+     * @param count      数量
+     * @param loginUser  登录用户
+     * @param namePrefix 名称前缀
+     * @return 上传数量
+     */
+    public Integer fetchFromPexels(String searchText, Integer count, User loginUser, String namePrefix,String source) {
+        int uploadCount = 0;
+        String apiKey = "XEpGZUQnnzSbx365K0dly3NHhjC42QvvskU4W86l2lEmlSBlpGkxY6lI";
+        String apiUrl = String.format("https://api.pexels.com/v1/search?query=%s&per_page=15", searchText);
+
+        // 获取已抓取的 URL 列表
+        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
+
+        OkHttpClient client = new OkHttpClient();
+
+        try {
+            int page = 1;
+            while (uploadCount < count) {
+                String pagedUrl = apiUrl + "&page=" + page;
+                Request request = new Request.Builder()
+                        .url(pagedUrl)
+                        .addHeader("Authorization", apiKey)
+                        .build();
+
+                Response response = client.newCall(request).execute();
+
+                if (!response.isSuccessful()) {
+                    throw new BusinessException(ErrorCode.OPERATION_ERROR, "Pexels API 调用失败");
+                }
+
+                JsonNode photos = new ObjectMapper().readTree(response.body().string()).get("photos");
+
+                if (photos == null || photos.isEmpty()) {
+                    log.warn("未找到更多图片，停止抓取");
+                    break;
+                }
+
+                for (JsonNode photo : photos) {
+                    String fileUrl = photo.get("src").get("original").asText();
+
+                    if (fetchedUrls.contains(fileUrl)) {
+                        log.info("图片已抓取过，跳过: {}", fileUrl);
+                        continue;
+                    }
+
+                    long fileSize = getFileSize(fileUrl);
+                    if (fileSize > 4 * 1024 * 1024) {
+                        log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
+                        continue;
+                    }
+
+                    PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+                    pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+
+                    try {
+                        PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+                        log.info("图片上传成功, id = {}", pictureVO.getId());
+                        uploadCount++;
+                        fetchedImagesService.saveFetchedUrl(fileUrl, source);
+                    } catch (Exception e) {
+                        log.error("图片上传失败", e);
+                    }
+
+                    if (uploadCount >= count) {
+                        break;
+                    }
+                }
+                page++;
+            }
+        } catch (Exception e) {
+            log.error("批量抓取 Pexels 图片失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取 Pexels 图片失败");
+        }
+
+        return uploadCount;
+    }
+
+
+    /**
+     * 抓取 Wallhaven 图片
+     *
+     * @param searchText 关键字
+     * @param count      数量
+     * @param loginUser  登录用户
+     * @param namePrefix 名称前缀
+     * @return 上传数量
+     */
+    public Integer fetchFromWallhaven(String searchText, Integer count, User loginUser, String namePrefix,String source) {
+        int uploadCount = 0;
+        String apiKey = "JaROJlCiPGYkyNWzAkx9vLQO5aojhDFP";
+        String apiUrl = String.format("https://wallhaven.cc/api/v1/search?q=%s&sorting=random&purity=100&categories=111", searchText);
+
+        // 获取已抓取的 URL 列表
+        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
+
+        OkHttpClient client = new OkHttpClient();
+
+        try {
+            // 分页抓取
+            int page = 1;
+            while (uploadCount < count) {
+                // 构建请求 URL
+                String pagedUrl = String.format("%s&page=%d", apiUrl, page);
+                Request request = new Request.Builder()
+                        .url(pagedUrl)
+                        .addHeader("Authorization", apiKey)
+                        .build();
+
+                Response response = client.newCall(request).execute();
+                if (!response.isSuccessful()) {
+                    throw new BusinessException(ErrorCode.OPERATION_ERROR, "Wallhaven API 调用失败");
+                }
+
+                String responseBody = response.body().string();
+                ObjectMapper objectMapper = new ObjectMapper();
+                JsonNode data = objectMapper.readTree(responseBody).get("data");
+
+                if (data == null || data.size() == 0) {
+                    log.warn("未找到更多图片，停止抓取");
+                    break;
+                }
+
+                for (JsonNode item : data) {
+                    String fileUrl = item.get("path").asText();
+
+                    // 检查是否已抓取过
+                    if (fetchedUrls.contains(fileUrl)) {
+                        log.info("图片已抓取过，跳过: {}", fileUrl);
+                        continue; // 跳过已抓取的图片
+                    }
+
+                    if (StrUtil.isBlank(namePrefix)) {
+                        namePrefix = searchText;
+                    }
+
+                    // **检查文件大小**
+                    long fileSize = getFileSize(fileUrl);
+                    if (fileSize > 4 * 1024 * 1024) {
+                        log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
+                        continue;
+                    }
+
+                    // 上传图片
+                    PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+                    pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+
+                    try {
+                        PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+                        log.info("图片上传成功, id = {}", pictureVO.getId());
+                        uploadCount++;
+
+                        // 保存已抓取的 URL 到数据库
+                        fetchedImagesService.saveFetchedUrl(fileUrl, source);
+                    } catch (Exception e) {
+                        log.error("图片上传失败", e);
+                        continue;
+                    }
+
+                    if (uploadCount >= count) {
+                        break;
+                    }
+                }
+                page++; // 获取下一页
+            }
+        } catch (Exception e) {
+            log.error("批量抓取 Wallhaven 图片失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取 Wallhaven 图片失败");
+        }
+
+        return uploadCount;
+    }
+
+    /**
+     * 抓取 HaoWallpaper 图片
+     *
+     * @param searchText 关键字
+     * @param count      数量
+     * @param loginUser  登录用户
+     * @param namePrefix 名称前缀
+     * @return 上传数量
+     */
+    public Integer fetchFromHaoWallpaper(String searchText, Integer count, User loginUser, String namePrefix,String source) {
+        int uploadCount = 0;
+        String baseUrl = "https://haowallpaper.com/homeView";
+
+        try {
+            // 从数据库中获取已抓取的 URL 列表
+            Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
+
+            // 分页抓取
+            int page = 1;
+            while (uploadCount < count) {
+                // 构建分页 URL
+                String fetchUrl = String.format("%s?page=%d", baseUrl, page);
+                log.info("正在抓取 URL: {}", fetchUrl);
+
+                // 获取 HTML 页面
+                Document document = Jsoup.connect(fetchUrl).get();
+
+                // 解析图片的元素
+                Elements imgElements = document.select("img");
+                if (imgElements.isEmpty()) {
+                    log.warn("未找到更多图片，停止抓取");
+                    break;
+                }
+
+                for (Element imgElement : imgElements) {
+                    // 提取图片 URL
+                    String fileUrl = imgElement.attr("src");
+                    // 获取 `alt` 属性值
+                    String altText = imgElement.attr("alt");
+
+                    // 检查 `alt` 属性是否包含关键词
+                    if (altText == null || !altText.contains(searchText)) {
+                        // 跳过不符合条件的图片
+                        continue;
+                    }
+
+                    if (!fileUrl.startsWith("http")) {
+                        // 补全相对路径
+                        fileUrl = "https://haowallpaper.com" + fileUrl;
+                    }
+
+                    // 检查是否已抓取过
+                    if (fetchedUrls.contains(fileUrl)) {
+                        log.info("图片已抓取过，跳过: {}", fileUrl);
+                        continue; // 跳过已抓取的图片
+                    }
+
+                    if (StrUtil.isBlank(namePrefix)) {
+                        namePrefix = searchText;
+                    }
+
+                    // **检查文件大小**
+                    long fileSize = getFileSize(fileUrl);
+                    if (fileSize > 4 * 1024 * 1024) {
+                        log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
+                        continue;
+                    }
+
+                    // 上传图片
+                    PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+                    pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+
+                    try {
+                        PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+                        log.info("图片上传成功, id = {}", pictureVO.getId());
+                        uploadCount++;
+
+                        // 保存已抓取的 URL 到数据库
+                        fetchedImagesService.saveFetchedUrl(fileUrl, source);
+                    } catch (Exception e) {
+                        log.error("图片上传失败", e);
+                        continue;
+                    }
+
+                    if (uploadCount >= count) {
+                        break;
+                    }
+                }
+
+                page++; // 下一页
+            }
+        } catch (Exception e) {
+            log.error("批量抓取 HaoWallpaper 图片失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取 HaoWallpaper 图片失败");
+        }
+
+        return uploadCount;
+    }
+
+
+    /**
+     * 获取图片文件大小
+     *
+     * @param fileUrl 图片 URL
+     * @return 文件大小（字节）
+     * @throws IOException IO 异常
+     */
+    private long getFileSize(String fileUrl) throws IOException {
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url(fileUrl)
+                .head() // 只获取 HTTP 头
+                .build();
+
+        Response response = client.newCall(request).execute();
+        if (!response.isSuccessful()) {
+            throw new IOException("无法获取文件大小: " + fileUrl);
+        }
+
+        String contentLength = response.header("Content-Length");
+        return contentLength != null ? Long.parseLong(contentLength) : 0;
     }
 
 
@@ -682,7 +1071,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         // 若数据库中也不存在对应图片，返回 0
         return 0L;
     }
-
 
 
     /**

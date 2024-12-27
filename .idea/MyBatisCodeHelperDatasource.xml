@@ -56,6 +56,19 @@
                 </TableGenerateConfig>
               </value>
             </entry>
+            <entry key="lg_picture:fetched_images">
+              <value>
+                <TableGenerateConfig>
+                  <option name="generatedKey" value="id" />
+                  <option name="javaModelName" value="FetchedImages" />
+                  <option name="moduleName" value="lg-picture-backend" />
+                  <option name="mybatisplusIdType" value="AUTO" />
+                  <option name="sequenceColumn" value="" />
+                  <option name="sequenceId" value="" />
+                  <option name="useActualColumnName" value="false" />
+                </TableGenerateConfig>
+              </value>
+            </entry>
             <entry key="lg_picture:picture">
               <value>
                 <TableGenerateConfig>
