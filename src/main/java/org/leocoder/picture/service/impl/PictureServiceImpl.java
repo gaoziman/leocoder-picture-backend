@@ -8,12 +8,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
@@ -39,6 +33,7 @@ import org.leocoder.picture.exception.BusinessException;
 import org.leocoder.picture.exception.ErrorCode;
 import org.leocoder.picture.exception.ThrowUtils;
 import org.leocoder.picture.manager.FileManager;
+import org.leocoder.picture.manager.image.*;
 import org.leocoder.picture.manager.upload.FilePictureUpload;
 import org.leocoder.picture.manager.upload.PictureUploadTemplate;
 import org.leocoder.picture.manager.upload.UrlPictureUpload;
@@ -83,6 +78,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     private final StringRedisTemplate redisTemplate;
 
     private final FetchedImagesService fetchedImagesService;
+
 
     /**
      * 上传图片
@@ -418,7 +414,79 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
 
     /**
-     * 根据不同的源抓取图片
+     * 通用的抓取图片逻辑
+     *
+     * @param fetcher    图片抓取器
+     * @param searchText 搜索关键词
+     * @param count      抓取数量
+     * @param loginUser  登录用户
+     * @param namePrefix 图片名称前缀
+     * @param source     数据源名称
+     * @return 成功抓取的图片数量
+     */
+    public Integer fetchImages(ImageFetcher fetcher, String searchText, Integer count, User loginUser,
+                               String namePrefix, String source) {
+        int uploadCount = 0;
+        int page = 1;
+        int pageSize = 10;
+
+        // 获取已抓取的 URL 列表
+        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
+
+        while (uploadCount < count) {
+            // 获取当前页图片 URL 列表
+            List<String> imageUrls = fetcher.fetchImageUrls(searchText, page, pageSize);
+
+            if (imageUrls.isEmpty()) {
+                log.warn("未找到更多图片，停止抓取");
+                break;
+            }
+
+            for (String fileUrl : imageUrls) {
+                if (fetchedUrls.contains(fileUrl)) {
+                    log.info("图片已抓取过，跳过: {}", fileUrl);
+                    continue;
+                }
+
+                // 检查文件大小
+                try {
+                    long fileSize = getFileSize(fileUrl);
+                    if (fileSize > 4 * 1024 * 1024) {
+                        log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
+                        continue;
+                    }
+                } catch (IOException e) {
+                    log.warn("无法获取文件大小，跳过: {}", fileUrl, e);
+                    continue;
+                }
+
+                // 上传图片
+                PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+                pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+
+                try {
+                    PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+                    log.info("图片上传成功, id = {}", pictureVO.getId());
+                    uploadCount++;
+                    fetchedImagesService.saveFetchedUrl(fileUrl, source);
+                } catch (Exception e) {
+                    log.error("图片上传失败", e);
+                }
+
+                if (uploadCount >= count) {
+                    break;
+                }
+            }
+
+            page++;
+        }
+
+        return uploadCount;
+    }
+
+
+    /**
+     * 根据不同源抓取图片
      *
      * @param requestParam 批量抓取请求参数
      * @param loginUser    登录用户
@@ -430,493 +498,40 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         Integer count = requestParam.getCount();
         String source = requestParam.getSource();
         String namePrefix = requestParam.getNamePrefix();
-        ThrowUtils.throwIf(StrUtil.isBlank(searchText), ErrorCode.PARAMS_ERROR, "搜索关键字不能为空");
-        ThrowUtils.throwIf(count == null || count <= 0 || count > 30, ErrorCode.PARAMS_ERROR, "抓取数量不合法");
-        ThrowUtils.throwIf(StrUtil.isBlank(source), ErrorCode.PARAMS_ERROR, "抓取源不能为空");
 
-        int uploadCount = 0;
 
-        try {
-            if ("baidu".equalsIgnoreCase(source)) {
-                uploadCount = fetchFromBaidu(searchText, count, loginUser, namePrefix,source);
-            } else if ("google".equalsIgnoreCase(source)) {
-                uploadCount = fetchFromGoogle(searchText, count, loginUser, namePrefix,source);
-            } else if ("bing".equalsIgnoreCase(source)) {
-                uploadCount = fetchFromBing(searchText, count, loginUser, namePrefix,source);
-            } else if ("pexels".equalsIgnoreCase(source)) {
-                uploadCount = fetchFromPexels(searchText, count, loginUser, namePrefix,source);
-            } else if ("wallhaven".equalsIgnoreCase(source)) {
-                uploadCount = fetchFromWallhaven(searchText, count, loginUser, namePrefix,source);
-            } else if ("haowallpaper".equalsIgnoreCase(source)) {
-                uploadCount = fetchFromHaoWallpaper(searchText, count, loginUser, namePrefix,source);
-            }else {
-                throw new BusinessException(ErrorCode.PARAMS_ERROR, "未知的抓取源：" + source);
-            }
-        } catch (Exception e) {
-            log.error("批量抓取图片失败", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取图片失败");
+
+        ImageFetcher fetcher;
+        Integer uploadCount = 0;
+
+        if ("haowallpaper".equals(source)) {
+            uploadCount = fetchFromHaoWallpaper(searchText, count, loginUser, namePrefix, source);
         }
 
-        return uploadCount;
-    }
-
-
-    /**
-     * 抓取百度图片
-     *
-     * @param searchText 关键字
-     * @param count      数量
-     * @param loginUser  登录用户
-     * @param namePrefix 名称前缀
-     * @return 上传数量
-     */
-    public Integer fetchFromBaidu(String searchText, Integer count, User loginUser, String namePrefix, String source) {
-        int uploadCount = 0;
-        String fetchUrl = String.format("https://images.baidu.com/search/acjson?tn=resultjson_com&word=%s&rn=30", searchText);
-
-        // 获取已抓取的 URL 列表
-        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
-
-        try {
-            int page = 0; // 页数从0开始
-            while (uploadCount < count) {
-                // 分页参数 `pn` 是从 0 开始，表示第几条图片
-                String pagedUrl = fetchUrl + "&pn=" + (page * 30);
-                log.info("Fetching URL: {}", pagedUrl);
-
-                // 获取 HTML 页面
-                Document document = Jsoup.connect(pagedUrl).ignoreContentType(true).get();
-
-                // 解析 JSON 数据
-                JsonObject jsonResponse = JsonParser.parseString(document.text()).getAsJsonObject();
-                JsonArray imgArray = jsonResponse.getAsJsonArray("data");
-
-                if (imgArray == null || imgArray.isEmpty()) {
-                    log.warn("未找到更多图片，停止抓取");
-                    break;
-                }
-
-                for (JsonElement element : imgArray) {
-                    // 跳过无效数据
-                    if (!element.isJsonObject()) {
-                        continue;
-                    }
-
-                    JsonObject imgObject = element.getAsJsonObject();
-                    String fileUrl = imgObject.has("thumbURL") ? imgObject.get("thumbURL").getAsString() : null;
-
-                    if (StrUtil.isBlank(fileUrl)) {
-                        log.warn("图片链接为空，跳过");
-                        continue;
-                    }
-
-                    // 检查是否已抓取过
-                    if (fetchedUrls.contains(fileUrl)) {
-                        log.info("图片已抓取过，跳过: {}", fileUrl);
-                        continue;
-                    }
-
-                    // 检查文件大小
-                    try {
-                        long fileSize = getFileSize(fileUrl);
-                        if (fileSize > 4 * 1024 * 1024) {
-                            log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
-                            continue;
-                        }
-                    } catch (IOException e) {
-                        log.warn("获取文件大小失败，跳过: {}", fileUrl, e);
-                        continue;
-                    }
-
-                    // 设置图片名称
-                    if (StrUtil.isBlank(namePrefix)) {
-                        namePrefix = searchText;
-                    }
-                    PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
-                    pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
-
-                    // 上传图片
-                    try {
-                        PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
-                        log.info("图片上传成功, id = {}", pictureVO.getId());
-                        uploadCount++;
-                        fetchedImagesService.saveFetchedUrl(fileUrl, source);
-                    } catch (Exception e) {
-                        log.error("图片上传失败", e);
-                        continue;
-                    }
-
-                    // 如果达到抓取数量，停止
-                    if (uploadCount >= count) {
-                        break;
-                    }
-                }
-
-                page++; // 下一页
-            }
-        } catch (Exception e) {
-            log.error("批量抓取 Baidu 图片失败", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取 Baidu 图片失败");
-        }
-
-        return uploadCount;
-    }
-
-
-    /**
-     * 抓取必应图片
-     *
-     * @param searchText 关键字
-     * @param count      数量
-     * @param loginUser  登录用户
-     * @param namePrefix 名称前缀
-     * @return 上传数量
-     */
-    public Integer fetchFromBing(String searchText, Integer count, User loginUser, String namePrefix, String source) {
-        ThrowUtils.throwIf(count > 30, ErrorCode.PARAMS_ERROR, "最多 30 条");
-        // 要抓取的地址
-        String fetchUrl = String.format("https://cn.bing.com/images/async?q=%s&mmasync=1", searchText);
-        // 获取已抓取的 URL 列表
-        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
-
-        Document document;
-        try {
-            document = Jsoup.connect(fetchUrl).get();
-        } catch (IOException e) {
-            log.error("获取页面失败", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "获取页面失败");
-        }
-        Element div = document.getElementsByClass("dgControl").first();
-        if (ObjUtil.isNull(div)) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "获取元素失败");
-        }
-        Elements imgElementList = div.select("img.mimg");
-        int uploadCount = 0;
-        for (Element imgElement : imgElementList) {
-            String fileUrl = imgElement.attr("src");
-            if (StrUtil.isBlank(fileUrl)) {
-                log.info("当前链接为空，已跳过: {}", fileUrl);
-                continue;
-            }
-            if (fetchedUrls.contains(fileUrl)) {
-                log.info("图片已抓取过，跳过: {}", fileUrl);
-                continue;
-            }
-
-
-            // 处理图片上传地址，防止出现转义问题
-            int questionMarkIndex = fileUrl.indexOf("?");
-            if (questionMarkIndex > -1) {
-                fileUrl = fileUrl.substring(0, questionMarkIndex);
-            }
-            if (StrUtil.isBlank(namePrefix)) {
-                namePrefix = searchText;
-            }
-            // 上传图片
-            PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
-            if (StrUtil.isNotBlank(namePrefix)) {
-                // 设置图片名称，序号连续递增
-                pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
-            }
-            try {
-                PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
-                log.info("图片上传成功, id = {}", pictureVO.getId());
-                uploadCount++;
-                fetchedImagesService.saveFetchedUrl(fileUrl, source);
-            } catch (Exception e) {
-                log.error("图片上传失败", e);
-                continue;
-            }
-            if (uploadCount >= count) {
+        switch (source.toLowerCase()) {
+            case "google":
+                fetcher = new GoogleImageFetcher();
                 break;
-            }
+            case "baidu":
+                fetcher = new BaiduImageFetcher();
+                break;
+            case "bing":
+                fetcher = new BingImageFetcher();
+                break;
+            case "pexels":
+                fetcher = new PexelsImageFetcher();
+                break;
+            case "wallhaven":
+                fetcher = new WallhavenImageFetcher();
+                break;
+            default:
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "未知的抓取源：" + source);
         }
-        return uploadCount;
+
+        return fetchImages(fetcher, searchText, count, loginUser, namePrefix, source);
     }
 
 
-    /**
-     * 抓取谷歌图片
-     *
-     * @param searchText 关键字
-     * @param count      数量
-     * @param loginUser  登录用户
-     * @param namePrefix 名称前缀
-     * @return 上传数量
-     */
-    public Integer fetchFromGoogle(String searchText, Integer count, User loginUser, String namePrefix, String source) {
-        int uploadCount = 0;
-        String apiKey = "AIzaSyBvU3jEggN8AtpNcF14jyty69rFvhLlQWA";
-        String cx = "f112f91a23b674acc";
-
-        // 构建 API 基础请求 URL
-        String apiUrl = String.format(
-                "https://www.googleapis.com/customsearch/v1?q=%s&num=10&searchType=image&key=%s&cx=%s",
-                searchText, apiKey, cx);
-
-        // 获取已抓取的 URL 列表
-        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
-
-        OkHttpClient client = new OkHttpClient();
-
-        try {
-            int page = 1;
-            while (uploadCount < count) {
-                // 根据页码计算起始索引 (Google API 的 start 参数从 1 开始)
-                String pagedUrl = apiUrl + "&start=" + ((page - 1) * 10 + 1);
-                log.info("Fetching URL: {}", pagedUrl);
-
-                // 构建请求
-                Request request = new Request.Builder().url(pagedUrl).build();
-                Response response = client.newCall(request).execute();
-
-                if (!response.isSuccessful()) {
-                    throw new BusinessException(ErrorCode.OPERATION_ERROR, "Google API 调用失败");
-                }
-
-                // 解析响应
-                String responseBody = response.body().string();
-                ObjectMapper objectMapper = new ObjectMapper();
-                JsonNode items = objectMapper.readTree(responseBody).get("items");
-
-                // 检查是否有更多图片
-                if (items == null || items.isEmpty()) {
-                    log.warn("未找到更多图片，停止抓取");
-                    break;
-                }
-
-                for (JsonNode item : items) {
-                    String fileUrl = item.get("link").asText();
-
-                    // 检查是否已抓取过
-                    if (fetchedUrls.contains(fileUrl)) {
-                        log.info("图片已抓取过，跳过: {}", fileUrl);
-                        continue;
-                    }
-
-                    // 设置名称前缀
-                    if (StrUtil.isBlank(namePrefix)) {
-                        namePrefix = searchText;
-                    }
-
-                    // 检查文件大小
-                    try {
-                        long fileSize = getFileSize(fileUrl);
-                        if (fileSize > 4 * 1024 * 1024) {
-                            log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
-                            continue;
-                        }
-                    } catch (IOException e) {
-                        log.warn("无法获取文件大小，跳过: {}", fileUrl, e);
-                        continue;
-                    }
-
-                    // 上传图片
-                    PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
-                    pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
-
-                    try {
-                        PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
-                        log.info("图片上传成功, id = {}", pictureVO.getId());
-                        uploadCount++;
-
-                        // 保存已抓取的 URL 到数据库
-                        fetchedImagesService.saveFetchedUrl(fileUrl, source);
-                    } catch (Exception e) {
-                        log.error("图片上传失败: {}", fileUrl, e);
-                    }
-
-                    // 如果达到抓取数量，停止
-                    if (uploadCount >= count) {
-                        break;
-                    }
-                }
-                page++; // 下一页
-            }
-        } catch (Exception e) {
-            log.error("批量抓取 Google 图片失败", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取 Google 图片失败");
-        }
-
-        return uploadCount;
-    }
-
-
-    /**
-     * 抓取 Pexels 图片
-     *
-     * @param searchText 关键字
-     * @param count      数量
-     * @param loginUser  登录用户
-     * @param namePrefix 名称前缀
-     * @return 上传数量
-     */
-    public Integer fetchFromPexels(String searchText, Integer count, User loginUser, String namePrefix,String source) {
-        int uploadCount = 0;
-        String apiKey = "XEpGZUQnnzSbx365K0dly3NHhjC42QvvskU4W86l2lEmlSBlpGkxY6lI";
-        String apiUrl = String.format("https://api.pexels.com/v1/search?query=%s&per_page=15", searchText);
-
-        // 获取已抓取的 URL 列表
-        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
-
-        OkHttpClient client = new OkHttpClient();
-
-        try {
-            int page = 1;
-            while (uploadCount < count) {
-                String pagedUrl = apiUrl + "&page=" + page;
-                Request request = new Request.Builder()
-                        .url(pagedUrl)
-                        .addHeader("Authorization", apiKey)
-                        .build();
-
-                Response response = client.newCall(request).execute();
-
-                if (!response.isSuccessful()) {
-                    throw new BusinessException(ErrorCode.OPERATION_ERROR, "Pexels API 调用失败");
-                }
-
-                JsonNode photos = new ObjectMapper().readTree(response.body().string()).get("photos");
-
-                if (photos == null || photos.isEmpty()) {
-                    log.warn("未找到更多图片，停止抓取");
-                    break;
-                }
-
-                for (JsonNode photo : photos) {
-                    String fileUrl = photo.get("src").get("original").asText();
-
-                    if (fetchedUrls.contains(fileUrl)) {
-                        log.info("图片已抓取过，跳过: {}", fileUrl);
-                        continue;
-                    }
-
-                    long fileSize = getFileSize(fileUrl);
-                    if (fileSize > 4 * 1024 * 1024) {
-                        log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
-                        continue;
-                    }
-
-                    PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
-                    pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
-
-                    try {
-                        PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
-                        log.info("图片上传成功, id = {}", pictureVO.getId());
-                        uploadCount++;
-                        fetchedImagesService.saveFetchedUrl(fileUrl, source);
-                    } catch (Exception e) {
-                        log.error("图片上传失败", e);
-                    }
-
-                    if (uploadCount >= count) {
-                        break;
-                    }
-                }
-                page++;
-            }
-        } catch (Exception e) {
-            log.error("批量抓取 Pexels 图片失败", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取 Pexels 图片失败");
-        }
-
-        return uploadCount;
-    }
-
-
-    /**
-     * 抓取 Wallhaven 图片
-     *
-     * @param searchText 关键字
-     * @param count      数量
-     * @param loginUser  登录用户
-     * @param namePrefix 名称前缀
-     * @return 上传数量
-     */
-    public Integer fetchFromWallhaven(String searchText, Integer count, User loginUser, String namePrefix,String source) {
-        int uploadCount = 0;
-        String apiKey = "JaROJlCiPGYkyNWzAkx9vLQO5aojhDFP";
-        String apiUrl = String.format("https://wallhaven.cc/api/v1/search?q=%s&sorting=random&purity=100&categories=111", searchText);
-
-        // 获取已抓取的 URL 列表
-        Set<String> fetchedUrls = fetchedImagesService.getFetchedUrlsBySource(source);
-
-        OkHttpClient client = new OkHttpClient();
-
-        try {
-            // 分页抓取
-            int page = 1;
-            while (uploadCount < count) {
-                // 构建请求 URL
-                String pagedUrl = String.format("%s&page=%d", apiUrl, page);
-                Request request = new Request.Builder()
-                        .url(pagedUrl)
-                        .addHeader("Authorization", apiKey)
-                        .build();
-
-                Response response = client.newCall(request).execute();
-                if (!response.isSuccessful()) {
-                    throw new BusinessException(ErrorCode.OPERATION_ERROR, "Wallhaven API 调用失败");
-                }
-
-                String responseBody = response.body().string();
-                ObjectMapper objectMapper = new ObjectMapper();
-                JsonNode data = objectMapper.readTree(responseBody).get("data");
-
-                if (data == null || data.size() == 0) {
-                    log.warn("未找到更多图片，停止抓取");
-                    break;
-                }
-
-                for (JsonNode item : data) {
-                    String fileUrl = item.get("path").asText();
-
-                    // 检查是否已抓取过
-                    if (fetchedUrls.contains(fileUrl)) {
-                        log.info("图片已抓取过，跳过: {}", fileUrl);
-                        continue; // 跳过已抓取的图片
-                    }
-
-                    if (StrUtil.isBlank(namePrefix)) {
-                        namePrefix = searchText;
-                    }
-
-                    // **检查文件大小**
-                    long fileSize = getFileSize(fileUrl);
-                    if (fileSize > 4 * 1024 * 1024) {
-                        log.warn("图片文件大小超过4MB，跳过: {}", fileUrl);
-                        continue;
-                    }
-
-                    // 上传图片
-                    PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
-                    pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
-
-                    try {
-                        PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
-                        log.info("图片上传成功, id = {}", pictureVO.getId());
-                        uploadCount++;
-
-                        // 保存已抓取的 URL 到数据库
-                        fetchedImagesService.saveFetchedUrl(fileUrl, source);
-                    } catch (Exception e) {
-                        log.error("图片上传失败", e);
-                        continue;
-                    }
-
-                    if (uploadCount >= count) {
-                        break;
-                    }
-                }
-                page++; // 获取下一页
-            }
-        } catch (Exception e) {
-            log.error("批量抓取 Wallhaven 图片失败", e);
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "批量抓取 Wallhaven 图片失败");
-        }
-
-        return uploadCount;
-    }
 
     /**
      * 抓取 HaoWallpaper 图片
@@ -927,7 +542,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
      * @param namePrefix 名称前缀
      * @return 上传数量
      */
-    public Integer fetchFromHaoWallpaper(String searchText, Integer count, User loginUser, String namePrefix,String source) {
+    public Integer fetchFromHaoWallpaper(String searchText, Integer count, User loginUser, String namePrefix, String source) {
         int uploadCount = 0;
         String baseUrl = "https://haowallpaper.com/homeView";
 

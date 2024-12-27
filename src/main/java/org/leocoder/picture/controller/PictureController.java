@@ -337,10 +337,8 @@ public class PictureController {
     @ApiOperation(value = "批量导入图片")
     @PostMapping("/upload/batch")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public Result<Integer> uploadPictureByBatch(
-            @RequestBody PictureUploadByBatchRequest requestParam,
-            HttpServletRequest request
-    ) {
+    public Result<Integer> uploadPictureByBatch(@RequestBody PictureUploadByBatchRequest requestParam, HttpServletRequest request) {
+        // 校验参数
         ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
         User loginUser = userService.getLoginUser(request);
         int uploadCount = pictureService.uploadPictureByBatch(requestParam, loginUser);
