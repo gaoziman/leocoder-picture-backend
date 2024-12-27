@@ -3,7 +3,9 @@ package org.leocoder.picture.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -41,7 +43,9 @@ import org.leocoder.picture.mapper.PictureMapper;
 import org.leocoder.picture.service.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
+import org.springframework.util.DigestUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
@@ -49,7 +53,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static org.leocoder.picture.utils.CaffeineClient.LOCAL_CACHE;
 
 /**
  * @author : 程序员Leo
@@ -78,6 +85,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     private final StringRedisTemplate redisTemplate;
 
     private final FetchedImagesService fetchedImagesService;
+
+    private final StringRedisTemplate stringRedisTemplate;
 
 
     /**
@@ -500,7 +509,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         String namePrefix = requestParam.getNamePrefix();
 
 
-
         ImageFetcher fetcher;
         Integer uploadCount = 0;
 
@@ -530,7 +538,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
         return fetchImages(fetcher, searchText, count, loginUser, namePrefix, source);
     }
-
 
 
     /**
@@ -731,5 +738,61 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             // 将数据库中的浏览量同步到Redis
             redisTemplate.opsForValue().set(key, String.valueOf(currentViewCount + 1));
         }
+    }
+
+
+    /**
+     * 分页查询图片信息，带缓存
+     *
+     * @param requestParam 分页查询请求参数
+     * @param request      请求对象
+     * @return 分页图片信息封装类
+     */
+    @Override
+    public Page<PictureVO> listPictureVOByPageWithCache(PictureQueryRequest requestParam, HttpServletRequest request) {
+        // 获取分页数据
+        long current = requestParam.getPageNum();
+        long size = requestParam.getPageSize();
+        // 限制爬虫
+        // ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
+        // 普通用户默认只能查看已过审的数据
+        requestParam.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+
+        // 构建缓存 key
+        String queryCondition = JSONUtil.toJsonStr(requestParam);
+        String hashKey = DigestUtils.md5DigestAsHex(queryCondition.getBytes());
+        String redisKey = "lgpicture:listPictureVOByPage:" + hashKey;
+
+        // 1. 查询本地缓存（Caffeine）
+        String cachedValue = LOCAL_CACHE.getIfPresent(redisKey);
+        if (ObjectUtil.isNotNull(cachedValue)) {
+            Page<PictureVO> cachedPage = JSONUtil.toBean(cachedValue, Page.class);
+            return cachedPage;
+        }
+
+        // 2. 查询分布式缓存（Redis）
+        ValueOperations<String, String> valueOps = stringRedisTemplate.opsForValue();
+        cachedValue = valueOps.get(redisKey);
+        if (ObjectUtil.isNotNull(cachedValue)) {
+            // 如果命中 Redis，存入本地缓存并返回
+            LOCAL_CACHE.put(redisKey, cachedValue);
+            Page<PictureVO> cachedPage = JSONUtil.toBean(cachedValue, Page.class);
+            return cachedPage;
+        }
+
+        // 3.缓存未命中，查询数据库
+        Page<Picture> picturePage = this.page(new Page<>(current, size),
+                this.getLambdaQueryWrapper(requestParam));
+        // 获得封装类
+        Page<PictureVO> pictureVOPage = this.getPictureVOPage(picturePage, request);
+        // 4. 更新缓存
+        String cacheValue = JSONUtil.toJsonStr(pictureVOPage);
+        // 更新本地缓存
+        LOCAL_CACHE.put(redisKey, cacheValue);
+        // 5 - 10 分钟随机过期，防止雪崩
+        int cacheExpireTime = 300 + RandomUtil.randomInt(0, 300);
+        valueOps.set(redisKey, cacheValue, cacheExpireTime, TimeUnit.SECONDS);
+
+        return pictureVOPage;
     }
 }

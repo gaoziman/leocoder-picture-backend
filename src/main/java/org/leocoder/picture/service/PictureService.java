@@ -118,4 +118,6 @@ public interface PictureService extends IService<Picture> {
      * @param pictureId 图片ID
      */
     void incrementViewCountInCache(Long pictureId);
+
+    Page<PictureVO> listPictureVOByPageWithCache(PictureQueryRequest requestParam, HttpServletRequest request);
 }
