@@ -30,8 +30,7 @@ public enum ErrorCode {
     BUSINESS_ERROR(50002, "业务异常"),
 
 
-
-    ;
+    EXIST(60001, "数据已存在");
 
     /**
      * 状态码

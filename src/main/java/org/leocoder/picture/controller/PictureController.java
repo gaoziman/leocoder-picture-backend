@@ -250,7 +250,7 @@ public class PictureController {
         long current = pictureQueryRequest.getPageNum();
         long size = pictureQueryRequest.getPageSize();
         // 限制爬虫
-        // ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         // 普通用户默认只能查看已过审的数据
         pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
         // 查询数据库
@@ -260,7 +260,7 @@ public class PictureController {
         return ResultUtils.success(pictureService.getPictureVOPage(picturePage, request));
     }
 
-    @ApiOperation(value = "分页获取图片列表（封装类）")
+    @ApiOperation(value = "分页获取图片列表(带缓存)")
     @PostMapping("/list/page/vo/cache")
     public Result<Page<PictureVO>> listPictureVOByPageWithCache(@RequestBody PictureQueryRequest requestParam,
                                                                 HttpServletRequest request) {

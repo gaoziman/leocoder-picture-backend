@@ -754,7 +754,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         long current = requestParam.getPageNum();
         long size = requestParam.getPageSize();
         // 限制爬虫
-        // ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         // 普通用户默认只能查看已过审的数据
         requestParam.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
 
