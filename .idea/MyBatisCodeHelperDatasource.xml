@@ -43,6 +43,19 @@
         <option name="mybatisPlusIdType" value="AUTO" />
         <option name="tableGenerateConfigs">
           <map>
+            <entry key="lg_picture:category">
+              <value>
+                <TableGenerateConfig>
+                  <option name="generatedKey" value="id" />
+                  <option name="javaModelName" value="Category" />
+                  <option name="moduleName" value="lg-picture-backend" />
+                  <option name="mybatisplusIdType" value="AUTO" />
+                  <option name="sequenceColumn" value="" />
+                  <option name="sequenceId" value="" />
+                  <option name="useActualColumnName" value="false" />
+                </TableGenerateConfig>
+              </value>
+            </entry>
             <entry key="lg_picture:comment">
               <value>
                 <TableGenerateConfig>
@@ -74,6 +87,19 @@
                 <TableGenerateConfig>
                   <option name="generatedKey" value="id" />
                   <option name="javaModelName" value="Picture" />
+                  <option name="moduleName" value="lg-picture-backend" />
+                  <option name="mybatisplusIdType" value="AUTO" />
+                  <option name="sequenceColumn" value="" />
+                  <option name="sequenceId" value="" />
+                  <option name="useActualColumnName" value="false" />
+                </TableGenerateConfig>
+              </value>
+            </entry>
+            <entry key="lg_picture:tag">
+              <value>
+                <TableGenerateConfig>
+                  <option name="generatedKey" value="id" />
+                  <option name="javaModelName" value="Tag" />
                   <option name="moduleName" value="lg-picture-backend" />
                   <option name="mybatisplusIdType" value="AUTO" />
                   <option name="sequenceColumn" value="" />
