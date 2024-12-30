@@ -1,9 +1,9 @@
 package org.leocoder.picture.manager.upload;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.NumberUtil;
-import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.qcloud.cos.model.PutObjectResult;
 import com.qcloud.cos.model.ciModel.persistence.CIObject;
@@ -63,11 +63,18 @@ public abstract class PictureUploadTemplate {
 
             ProcessResults processResults = putObjectResult.getCiUploadResult().getProcessResults();
             List<CIObject> objectList = processResults.getObjectList();
-            if (ObjectUtil.isNotEmpty(objectList)) {
+            if (CollUtil.isNotEmpty(objectList)) {
                 CIObject compressedCiObject = objectList.get(0);
+                // 缩略图默认等于压缩图
+                CIObject thumbnailCiObject = compressedCiObject;
+                // 有生成缩略图，才得到缩略图
+                if (objectList.size() > 1) {
+                    thumbnailCiObject = objectList.get(1);
+                }
                 // 封装压缩图返回结果
-                return buildResult(originFilename, compressedCiObject);
+                return buildResult(originFilename, compressedCiObject, thumbnailCiObject);
             }
+
 
             // 5. 封装返回结果
             return buildResult(originFilename, file, uploadPath, imageInfo);
@@ -97,6 +104,11 @@ public abstract class PictureUploadTemplate {
 
     /**
      * 封装返回结果
+     * @param originFilename 原始文件名
+     * @param file 临时文件
+     * @param uploadPath 上传路径
+     * @param imageInfo 图片信息
+     * @return 上传结果
      */
     private UploadPictureResult buildResult(String originFilename, File file, String uploadPath, ImageInfo imageInfo) {
         UploadPictureResult uploadPictureResult = new UploadPictureResult();
@@ -118,9 +130,10 @@ public abstract class PictureUploadTemplate {
      * 封装返回结果
      * @param originFilename     原始文件名
      * @param compressedCiObject 压缩后的图片对象
-     * @return
+     * @param thumbnailCiObject  缩略图对象
+     * @return 上传结果
      */
-    private UploadPictureResult buildResult(String originFilename, CIObject compressedCiObject) {
+    private UploadPictureResult buildResult(String originFilename, CIObject compressedCiObject, CIObject thumbnailCiObject) {
         UploadPictureResult uploadPictureResult = new UploadPictureResult();
         int picWidth = compressedCiObject.getWidth();
         int picHeight = compressedCiObject.getHeight();
@@ -133,6 +146,8 @@ public abstract class PictureUploadTemplate {
         uploadPictureResult.setPicSize(compressedCiObject.getSize().longValue());
         // 设置图片为压缩后的地址
         uploadPictureResult.setUrl(cosClientConfig.getHost() + "/" + compressedCiObject.getKey());
+        // 设置缩略图
+        uploadPictureResult.setThumbnailUrl(cosClientConfig.getHost() + "/" + thumbnailCiObject.getKey());
         return uploadPictureResult;
     }
 

@@ -77,7 +77,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
 
         // 4.保存用户信息
-        User user = User.builder().userAccount(userAccount).userPassword(encryptedPassword).userRole(UserRoleEnum.USER.getValue()).userName("无名用户").build();
+        User user = User.builder()
+                .userAccount(userAccount)
+                .userPassword(encryptedPassword).userRole(UserRoleEnum.USER.getValue())
+                .userAvatar("https://leocoder-1310214282.cos.ap-shanghai.myqcloud.com//public/avatar/2024-12-30_8KjkvgrQ1wCoIUes.png")
+                .userName("无名用户").build();
 
         boolean saveResult = this.save(user);
         if (!saveResult) {

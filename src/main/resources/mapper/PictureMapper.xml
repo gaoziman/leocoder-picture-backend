@@ -6,6 +6,7 @@
         <!--@Table picture-->
         <id column="id" jdbcType="BIGINT" property="id"/>
         <result column="url" jdbcType="VARCHAR" property="url"/>
+        <result column="thumbnail_url"  property="thumbnailUrl" jdbcType="VARCHAR"/>
         <result column="name" jdbcType="VARCHAR" property="name"/>
         <result column="introduction" jdbcType="VARCHAR" property="introduction"/>
         <result column="category" jdbcType="VARCHAR" property="category"/>
@@ -28,6 +29,7 @@
         <!--@mbg.generated-->
         id,
         url,
+        thumbnail_url,
         `name`,
         introduction,
         category,

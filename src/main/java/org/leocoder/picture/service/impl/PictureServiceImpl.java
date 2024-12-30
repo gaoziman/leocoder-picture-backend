@@ -148,6 +148,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     private static Picture getPicture(User loginUser, UploadPictureResult uploadPictureResult, Long pictureId, PictureUploadRequest requestParam) {
         Picture picture = Picture.builder().build();
         picture.setUrl(uploadPictureResult.getUrl());
+        picture.setThumbnailUrl(uploadPictureResult.getThumbnailUrl());
         String picName = uploadPictureResult.getPicName();
         if (ObjectUtil.isNotEmpty(requestParam) && StrUtil.isNotBlank(requestParam.getPicName())) {
             picName = requestParam.getPicName();
