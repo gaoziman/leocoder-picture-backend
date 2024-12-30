@@ -795,4 +795,32 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
         return pictureVOPage;
     }
+
+    /**
+     * 管理员手动刷新缓存
+     *
+     * @param requestParam 图片查询请求参数
+     * @return 刷新是否成功
+     */
+    @Override
+    public boolean refreshCache(PictureQueryRequest requestParam, HttpServletRequest request) {
+        String redisKeyPrefix = "lgpicture:listPictureVOByPage:";
+        try {
+            // 获取所有符合前缀的键
+            Set<String> keys = stringRedisTemplate.keys(redisKeyPrefix + "*");
+            if (keys != null && !keys.isEmpty()) {
+                // 删除 Redis 中所有相关的键
+                stringRedisTemplate.delete(keys);
+                // 删除 Caffeine 本地缓存中相关的键
+                keys.forEach(LOCAL_CACHE::invalidate);
+                log.info("缓存刷新成功，已删除键集合：{}", keys);
+            } else {
+                log.info("未找到需要删除的缓存键");
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("刷新缓存失败", e);
+            return false;
+        }
+    }
 }

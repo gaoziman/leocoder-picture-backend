@@ -54,7 +54,11 @@ public class PictureScheduledTask {
         log.info("定时任务：同步图片浏览数据到数据库完成。");
     }
 
-    @Scheduled(cron = "0 0/1 * * * ?") // 每5分钟执行一次
+
+    /**
+     * 定时任务：恢复 Redis 中的浏览数据
+     */
+    @Scheduled(cron = "0 0/5 * * * ?") // 每5分钟执行一次
     public void recoverViewCount() {
         // 获取所有图片ID
         List<Picture> pictureList = pictureService.list();

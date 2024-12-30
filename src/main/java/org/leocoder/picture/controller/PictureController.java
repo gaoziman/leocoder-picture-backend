@@ -268,6 +268,21 @@ public class PictureController {
         return ResultUtils.success(picturePage);
     }
 
+    @ApiOperation(value = "刷新缓存（仅管理员可用）")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    @PostMapping("/refreshCache")
+    public Result<Boolean> refreshCache(@RequestBody PictureQueryRequest requestParam, HttpServletRequest request) {
+        // 校验参数
+        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+
+        // 调用服务层方法刷新缓存
+        boolean refreshResult = pictureService.refreshCache(requestParam,request);
+        ThrowUtils.throwIf(!refreshResult, ErrorCode.OPERATION_ERROR, "缓存刷新失败");
+
+        return ResultUtils.success(true);
+    }
+
 
 
     @ApiOperation(value = "分页获取已发布图片列表（封装类）")

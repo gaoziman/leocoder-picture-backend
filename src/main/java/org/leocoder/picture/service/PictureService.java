@@ -25,7 +25,7 @@ public interface PictureService extends IService<Picture> {
     /**
      * 上传图片
      *
-     * @param inputSource        上传文件
+     * @param inputSource          上传文件
      * @param pictureUploadRequest 图片上传请求
      * @param loginUser            登录用户
      * @return 图片信息
@@ -89,8 +89,8 @@ public interface PictureService extends IService<Picture> {
     /**
      * 批量抓取和创建图片
      *
-     * @param requestParam  批量抓取请求参数
-     * @param loginUser 登录用户
+     * @param requestParam 批量抓取请求参数
+     * @param loginUser    登录用户
      * @return 成功创建的图片数
      */
     Integer uploadPictureByBatch(PictureUploadByBatchRequest requestParam, User loginUser);
@@ -119,5 +119,23 @@ public interface PictureService extends IService<Picture> {
      */
     void incrementViewCountInCache(Long pictureId);
 
+
+    /**
+     * 分页获取图片信息封装类，带缓存
+     *
+     * @param requestParam 图片查询请求参数
+     * @param request      请求对象
+     * @return 分页图片信息封装类
+     */
     Page<PictureVO> listPictureVOByPageWithCache(PictureQueryRequest requestParam, HttpServletRequest request);
+
+
+    /**
+     * 管理员手动刷新缓存
+     *
+     * @param requestParam 图片查询请求参数
+     * @return 刷新是否成功
+     */
+    boolean refreshCache(PictureQueryRequest requestParam, HttpServletRequest request);
+
 }
