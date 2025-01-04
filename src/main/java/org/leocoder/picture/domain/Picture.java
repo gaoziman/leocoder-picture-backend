@@ -158,6 +158,13 @@ public class Picture implements Serializable {
     private Long viewCount;
 
     /**
+     * 空间 id
+     */
+    @TableField(value = "space_id")
+    private Long spaceId;
+
+
+    /**
      * 是否删除
      */
     @TableField(value = "is_delete")

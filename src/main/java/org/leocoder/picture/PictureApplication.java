@@ -35,7 +35,7 @@ public class PictureApplication implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        String hostAddress = "leocoder";
+        String hostAddress = "myserver.coder";
         Integer port = serverProperties.getPort();
         String contextPath = serverProperties.getServlet().getContextPath();
 

@@ -95,6 +95,19 @@
                 </TableGenerateConfig>
               </value>
             </entry>
+            <entry key="lg_picture:space">
+              <value>
+                <TableGenerateConfig>
+                  <option name="generatedKey" value="id" />
+                  <option name="javaModelName" value="Space" />
+                  <option name="moduleName" value="lg-picture-backend" />
+                  <option name="mybatisplusIdType" value="AUTO" />
+                  <option name="sequenceColumn" value="" />
+                  <option name="sequenceId" value="" />
+                  <option name="useActualColumnName" value="false" />
+                </TableGenerateConfig>
+              </value>
+            </entry>
             <entry key="lg_picture:tag">
               <value>
                 <TableGenerateConfig>

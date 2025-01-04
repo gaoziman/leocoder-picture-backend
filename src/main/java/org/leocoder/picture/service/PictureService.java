@@ -3,12 +3,10 @@ package org.leocoder.picture.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.leocoder.picture.common.DeleteRequest;
 import org.leocoder.picture.domain.Picture;
 import org.leocoder.picture.domain.User;
-import org.leocoder.picture.domain.dto.picture.PictureQueryRequest;
-import org.leocoder.picture.domain.dto.picture.PictureReviewRequest;
-import org.leocoder.picture.domain.dto.picture.PictureUploadByBatchRequest;
-import org.leocoder.picture.domain.dto.picture.PictureUploadRequest;
+import org.leocoder.picture.domain.dto.picture.*;
 import org.leocoder.picture.domain.vo.picture.PictureVO;
 
 import javax.servlet.http.HttpServletRequest;
@@ -32,6 +30,13 @@ public interface PictureService extends IService<Picture> {
      */
     PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser);
 
+    /**
+     * 删除图片校验
+     *
+     * @param loginUser 登录用户
+     * @param picture   图片信息
+     */
+    void checkPictureAuth(User loginUser, Picture picture);
 
     /**
      * 通用的查询条件构造器
@@ -138,4 +143,39 @@ public interface PictureService extends IService<Picture> {
      */
     boolean refreshCache(PictureQueryRequest requestParam, HttpServletRequest request);
 
+
+    /**
+     * 编辑图片信息（用户使用）
+     *
+     * @param requestParam 图片编辑请求参数
+     * @param request      请求对象
+     */
+    void editPicture(PictureEditRequest requestParam, HttpServletRequest request);
+
+
+    /**
+     * 批量删除图片
+     *
+     * @param requestParam 批量删除请求参数
+     * @param request      请求对象
+     */
+    void deleteBatchPicture(DeleteBatchRequest requestParam, HttpServletRequest request);
+
+
+    /**
+     * 删除图片
+     *
+     * @param deleteRequest 删除请求参数
+     * @param request       请求对象
+     */
+    void deletePicture(DeleteRequest deleteRequest, HttpServletRequest request);
+
+
+    /**
+     * 更新图片信息（管理员使用）
+     *
+     * @param requestParam 图片更新请求参数
+     * @param request      请求对象
+     */
+    void updatePicture(PictureUpdateRequest requestParam, HttpServletRequest request);
 }

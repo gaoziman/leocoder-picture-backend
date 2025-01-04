@@ -23,6 +23,7 @@
         <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
         <result column="edit_time" jdbcType="TIMESTAMP" property="editTime"/>
         <result column="update_time" jdbcType="TIMESTAMP" property="updateTime"/>
+        <result column="space_id" jdbcType="TIMESTAMP" property="spaceId"/>
         <result column="is_delete" jdbcType="TINYINT" property="isDelete"/>
     </resultMap>
     <sql id="Base_Column_List">
@@ -47,6 +48,7 @@
         create_time,
         edit_time,
         update_time,
+        space_id,
         is_delete
     </sql>
 

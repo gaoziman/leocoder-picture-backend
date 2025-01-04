@@ -66,9 +66,9 @@ ALTER TABLE comment ADD COLUMN like_count INT DEFAULT 0 COMMENT '评论的点赞
 
 ALTER TABLE user_like ADD COLUMN is_liked INT DEFAULT 0 COMMENT '0表示未点赞，1表示已点赞';
 
-ALTER TABLE user_like
-    ADD like_type TINYINT NOT NULL DEFAULT 0 COMMENT '点赞类型，0-图片，1-评论';
+ALTER TABLE user_like ADD like_type TINYINT NOT NULL DEFAULT 0 COMMENT '点赞类型，0-图片，1-评论';
 
+-- 新增是否收藏字段
 ALTER TABLE user_favorite ADD COLUMN is_favorited INT DEFAULT 0 COMMENT '0表示未收藏，1表示已收藏';
 
 -- 新增图片浏览次数字段
@@ -77,6 +77,16 @@ ALTER TABLE picture ADD COLUMN view_count INT DEFAULT 0 COMMENT '图片浏览次
 -- 创建基于 reviewStatus 列的索引
 CREATE INDEX idx_review_status ON picture (review_status);
 
+ALTER TABLE picture
+    -- 添加新列
+    ADD COLUMN thumbnailUrl varchar(512) NULL COMMENT '缩略图 url';
+
+-- 添加新列
+ALTER TABLE picture
+    ADD COLUMN space_id  bigint  null comment '空间 id（为空表示公共空间）';
+
+-- 创建索引
+CREATE INDEX idx_spaceId ON picture (space_id);
 
 
 
@@ -124,3 +134,54 @@ CREATE TABLE IF NOT EXISTS user_points (
                                            create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
                                            INDEX idx_user_id (user_id)
 ) COMMENT '用户积分记录表';
+
+-- 记录已抓取的图片信息
+CREATE TABLE fetched_images (
+                                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                                image_url VARCHAR(255) NOT NULL UNIQUE, -- 限制长度到 255
+                                hash_value VARCHAR(256),               -- 文件哈希值（可选）
+                                source VARCHAR(100),                   -- 来源网站
+                                create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+
+-- 标签表
+CREATE TABLE tag (
+                     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                     name VARCHAR(255) NOT NULL UNIQUE COMMENT '标签名称',
+                     description TEXT COMMENT '标签描述',
+                     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+);
+
+-- 分类表
+CREATE TABLE category (
+                          id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                          name VARCHAR(255) NOT NULL UNIQUE COMMENT '分类名称',
+                          description TEXT COMMENT '分类描述',
+                          create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                          update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+);
+
+
+-- 空间表
+CREATE TABLE IF NOT EXISTS space
+(
+    id               BIGINT AUTO_INCREMENT COMMENT 'id' PRIMARY KEY,
+    space_name       VARCHAR(128)                       NULL COMMENT '空间名称',
+    space_level      INT      DEFAULT 0                 NULL COMMENT '空间级别：0-普通版 1-专业版 2-旗舰版',
+    max_size         BIGINT   DEFAULT 0                 NULL COMMENT '空间图片的最大总大小',
+    max_count        BIGINT   DEFAULT 0                 NULL COMMENT '空间图片的最大数量',
+    total_size       BIGINT   DEFAULT 0                 NULL COMMENT '当前空间下图片的总大小',
+    total_count      BIGINT   DEFAULT 0                 NULL COMMENT '当前空间下的图片数量',
+    user_id          BIGINT                             NOT NULL COMMENT '创建用户 id',
+    create_time      DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    edit_time        DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '编辑时间',
+    update_time      DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    is_delete        TINYINT  DEFAULT 0                 NOT NULL COMMENT '是否删除',
+    -- 索引设计
+    INDEX idx_user_id (user_id),          -- 提升基于用户的查询效率
+    INDEX idx_space_name (space_name),   -- 提升基于空间名称的查询效率
+    INDEX idx_space_level (space_level)  -- 提升按空间级别查询的效率
+) COMMENT '空间' COLLATE = utf8mb4_unicode_ci;
