@@ -89,6 +89,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
     private final TransactionTemplate transactionTemplate;
 
+    private final CommentService commentService;
+
 
     /**
      * 上传图片
@@ -986,29 +988,59 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         // 校验权限
         checkPictureAuth(loginUser, oldPicture);
         // 开启事务
-        transactionTemplate.execute(status -> {
-            // 操作数据库
-            boolean result = this.removeById(id);
-            ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-            // 释放额度
-            Long spaceId = oldPicture.getSpaceId();
-            if (ObjectUtil.isNotNull(spaceId)) {
-                boolean update = spaceService.lambdaUpdate()
-                        .eq(Space::getId, spaceId)
-                        .setSql("total_size = total_size - " + oldPicture.getPicSize())
-                        .setSql("total_count = total_count - 1")
-                        .update();
-                ThrowUtils.throwIf(!update, ErrorCode.OPERATION_ERROR, "额度更新失败");
-            }
-            return true;
-        });
+        // 操作数据库
+        // 释放额度
         // 删除点赞记录（仅当点赞记录存在时才删除）
-        long likeCount = likeService.count(new QueryWrapper<Like>().eq("picture_id", id));
-        if (likeCount > 0) {
-            boolean removed = likeService.remove(new QueryWrapper<Like>().eq("picture_id", id));
-            ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR);
-        }
-        // 删除评论记录 todo
+        // 删除收藏记录（仅当收藏记录存在时才删除）
+        // 删除收藏记录
+        // 删除评论记录 （仅当评论记录存在时才删除）
+        // 手动回滚事务
+        boolean transactionResult = Boolean.TRUE.equals(transactionTemplate.execute(status -> {
+            try {
+
+                // 操作数据库
+                boolean result = this.removeById(id);
+                ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+                // 释放额度
+                Long spaceId = oldPicture.getSpaceId();
+                if (ObjectUtil.isNotNull(spaceId)) {
+                    boolean update = spaceService.lambdaUpdate()
+                            .eq(Space::getId, spaceId)
+                            .setSql("total_size = total_size - " + oldPicture.getPicSize())
+                            .setSql("total_count = total_count - 1")
+                            .update();
+                    ThrowUtils.throwIf(!update, ErrorCode.OPERATION_ERROR, "额度更新失败");
+                }
+                // 删除点赞记录（仅当点赞记录存在时才删除）
+                long likeCount = likeService.count(new QueryWrapper<Like>().eq("picture_id", id));
+                if (likeCount > 0) {
+                    boolean removed = likeService.remove(new QueryWrapper<Like>().eq("picture_id", id));
+                    ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR);
+                }
+                // 删除收藏记录（仅当收藏记录存在时才删除）
+                LambdaQueryWrapper<Favorite> favoriteLambdaQueryWrapper = Wrappers.lambdaQuery(Favorite.class)
+                        .eq(Favorite::getPictureId, id)
+                        .eq(Favorite::getUserId, loginUser.getId());
+                long favoriteCount = favoriteService.count(favoriteLambdaQueryWrapper);
+                if (favoriteCount > 0) {
+                    // 删除收藏记录
+                    boolean removed = favoriteService.remove(favoriteLambdaQueryWrapper);
+                    ThrowUtils.throwIf(!removed, ErrorCode.OPERATION_ERROR);
+                }
+                // 删除评论记录 （仅当评论记录存在时才删除）
+                LambdaQueryWrapper<Comment> commentLambdaQueryWrapper = Wrappers.lambdaQuery(Comment.class)
+                        .eq(Comment::getPictureId, id);
+                boolean commentsRemoved = commentService.remove(commentLambdaQueryWrapper);
+                ThrowUtils.throwIf(!commentsRemoved, ErrorCode.OPERATION_ERROR, "图片评论记录删除失败");
+                return true;
+            } catch (Exception e) {
+                status.setRollbackOnly(); // 手动回滚事务
+                log.error("删除图片事务失败，pictureId: {}", id, e);
+                return false;
+            }
+        }));
+        // 判断事务结果
+        ThrowUtils.throwIf(!transactionResult, ErrorCode.OPERATION_ERROR, "图片删除事务失败");
     }
 
     /**

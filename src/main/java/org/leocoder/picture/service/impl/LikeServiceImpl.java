@@ -5,8 +5,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.leocoder.picture.domain.Like;
-import org.leocoder.picture.exception.ErrorCode;
-import org.leocoder.picture.exception.ThrowUtils;
 import org.leocoder.picture.mapper.CommentMapper;
 import org.leocoder.picture.mapper.LikeMapper;
 import org.leocoder.picture.mapper.PictureMapper;
@@ -56,38 +54,35 @@ public class LikeServiceImpl extends ServiceImpl<LikeMapper, Like> implements Li
         String likeCacheKey = "user:" + userId + ":liked:" + targetId + ":type:" + likeType;
         String likeCountKey = LIKE_COUNT_KEY_PREFIX + targetId + ":type:" + likeType;
 
-        if (isLike) {
-            // 点赞逻辑
-            ThrowUtils.throwIf(redisTemplate.hasKey(likeCacheKey), ErrorCode.BUSINESS_ERROR, "用户已点赞");
+        // 使用 Redis 分布式锁，防止高并发问题
+        String lockKey = "lock:" + likeCacheKey;
+        boolean isLockAcquired = false;
 
-            // 插入点赞记录
-            Like userLike = new Like();
-            userLike.setUserId(userId);
-            // 对于评论 targetId 表示评论ID
-            userLike.setPictureId(targetId);
-            userLike.setLikeType(likeType);
-            userLike.setIsLiked(1);
-            userLikeMapper.insert(userLike);
+        try {
+            // 尝试获取锁
+            isLockAcquired = acquireLock(lockKey, 5);
 
-            // 更新点赞数
-            updateLikeCount(targetId, likeType, 1);
-
-            // 设置 Redis 缓存
-            redisTemplate.opsForValue().set(likeCacheKey, "1", 1, TimeUnit.DAYS);
-        } else {
-            // 取消点赞逻辑
-            Like userLike = userLikeMapper.findByUserIdAndPictureId(userId, targetId, likeType);
-            ThrowUtils.throwIf(!redisTemplate.hasKey(likeCacheKey) && ObjectUtil.isNull(userLike),
-                    ErrorCode.BUSINESS_ERROR, "用户未点赞，无法取消");
-
-            // 删除点赞记录
-            userLikeMapper.deleteByUserIdAndPictureId(userId, targetId, likeType);
-
-            // 更新点赞数
-            updateLikeCount(targetId, likeType, -1);
-
-            // 删除 Redis 缓存
-            redisTemplate.delete(likeCacheKey);
+            if (isLockAcquired) {
+                // 如果成功获取锁，按正常逻辑处理
+                if (isLike) {
+                    handleLikeWithFallback(userId, targetId, likeType, likeCacheKey, likeCountKey);
+                } else {
+                    handleUnlikeWithFallback(userId, targetId, likeType, likeCacheKey, likeCountKey);
+                }
+            } else {
+                // Redis 锁不可用，降级执行
+                log.warn("Redis 锁不可用，执行降级逻辑");
+                if (isLike) {
+                    handleLikeWithDatabaseOnly(userId, targetId, likeType);
+                } else {
+                    handleUnlikeWithDatabaseOnly(userId, targetId, likeType);
+                }
+            }
+        } finally {
+            // 如果获取了锁，则释放锁
+            if (isLockAcquired) {
+                releaseLock(lockKey);
+            }
         }
 
         return true;
@@ -145,5 +140,121 @@ public class LikeServiceImpl extends ServiceImpl<LikeMapper, Like> implements Li
                 }
             }
         }
+    }
+
+    /**
+     * 点赞逻辑降级处理（仅操作数据库）
+     */
+    private void handleLikeWithDatabaseOnly(Long userId, Long targetId, Integer likeType) {
+        // 检查用户是否已经点赞（从数据库中检查）
+        Like existingLike = userLikeMapper.findByUserIdAndPictureId(userId, targetId, likeType);
+        if (ObjectUtil.isNotNull(existingLike) && existingLike.getIsLiked() == 1) {
+            throw new RuntimeException("用户已点赞");
+        }
+
+        // 插入点赞记录到数据库
+        Like userLike = new Like();
+        userLike.setUserId(userId);
+        userLike.setPictureId(targetId);
+        userLike.setLikeType(likeType);
+        userLike.setIsLiked(1);
+        userLikeMapper.insert(userLike);
+
+        // 更新数据库中的点赞数
+        updateLikeCount(targetId, likeType, 1);
+    }
+
+    /**
+     * 取消点赞逻辑降级处理（仅操作数据库）
+     */
+    private void handleUnlikeWithDatabaseOnly(Long userId, Long targetId, Integer likeType) {
+        // 检查用户是否未点赞（从数据库中检查）
+        Like existingLike = userLikeMapper.findByUserIdAndPictureId(userId, targetId, likeType);
+        if (ObjectUtil.isNull(existingLike) || existingLike.getIsLiked() == 0) {
+            throw new RuntimeException("用户未点赞，无法取消");
+        }
+
+        // 删除点赞记录
+        userLikeMapper.deleteByUserIdAndPictureId(userId, targetId, likeType);
+
+        // 更新数据库中的点赞数
+        updateLikeCount(targetId, likeType, -1);
+    }
+
+    /**
+     * 点赞逻辑（带有 Redis 和数据库的降级支持）
+     */
+    private void handleLikeWithFallback(Long userId, Long targetId, Integer likeType, String likeCacheKey, String likeCountKey) {
+        try {
+            // 检查用户是否已经点赞
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(likeCacheKey))) {
+                throw new RuntimeException("用户已点赞");
+            }
+
+            // 插入点赞记录
+            Like userLike = new Like();
+            userLike.setUserId(userId);
+            userLike.setPictureId(targetId);
+            userLike.setLikeType(likeType);
+            userLike.setIsLiked(1);
+            userLikeMapper.insert(userLike);
+
+            // 更新点赞数
+            updateLikeCount(targetId, likeType, 1);
+
+            // 设置 Redis 缓存
+            redisTemplate.opsForValue().set(likeCacheKey, "1", 1, TimeUnit.DAYS);
+        } catch (Exception e) {
+            log.warn("Redis 不可用，降级处理点赞逻辑", e);
+            handleLikeWithDatabaseOnly(userId, targetId, likeType);
+        }
+    }
+
+    /**
+     * 取消点赞逻辑（带有 Redis 和数据库的降级支持）
+     */
+    private void handleUnlikeWithFallback(Long userId, Long targetId, Integer likeType, String likeCacheKey, String likeCountKey) {
+        try {
+            // 检查用户是否未点赞
+            if (!Boolean.TRUE.equals(redisTemplate.hasKey(likeCacheKey))) {
+                Like existingLike = userLikeMapper.findByUserIdAndPictureId(userId, targetId, likeType);
+                if (ObjectUtil.isNull(existingLike)) {
+                    throw new RuntimeException("用户未点赞，无法取消");
+                }
+            }
+
+            // 删除点赞记录
+            userLikeMapper.deleteByUserIdAndPictureId(userId, targetId, likeType);
+
+            // 更新点赞数
+            updateLikeCount(targetId, likeType, -1);
+
+            // 删除 Redis 缓存
+            redisTemplate.delete(likeCacheKey);
+        } catch (Exception e) {
+            log.warn("Redis 不可用，降级处理取消点赞逻辑", e);
+            handleUnlikeWithDatabaseOnly(userId, targetId, likeType);
+        }
+    }
+
+    /**
+     * 获取 Redis 锁
+     *
+     * @param lockKey 锁的键
+     * @param timeout 锁的过期时间（秒）
+     * @return 是否成功获取锁
+     */
+    private boolean acquireLock(String lockKey, int timeout) {
+        Boolean isLocked = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", timeout, TimeUnit.SECONDS);
+        return Boolean.TRUE.equals(isLocked);
+    }
+
+    /**
+     * 释放 Redis 锁
+     *
+     * @param lockKey 锁的键
+     */
+    private void releaseLock(String lockKey) {
+        redisTemplate.delete(lockKey);
     }
 }
