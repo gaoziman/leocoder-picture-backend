@@ -987,14 +987,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         ThrowUtils.throwIf(ObjectUtil.isNull(oldPicture), ErrorCode.NOT_FOUND_ERROR);
         // 校验权限
         checkPictureAuth(loginUser, oldPicture);
-        // 开启事务
-        // 操作数据库
-        // 释放额度
-        // 删除点赞记录（仅当点赞记录存在时才删除）
-        // 删除收藏记录（仅当收藏记录存在时才删除）
-        // 删除收藏记录
-        // 删除评论记录 （仅当评论记录存在时才删除）
-        // 手动回滚事务
         boolean transactionResult = Boolean.TRUE.equals(transactionTemplate.execute(status -> {
             try {
 
@@ -1030,8 +1022,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
                 // 删除评论记录 （仅当评论记录存在时才删除）
                 LambdaQueryWrapper<Comment> commentLambdaQueryWrapper = Wrappers.lambdaQuery(Comment.class)
                         .eq(Comment::getPictureId, id);
-                boolean commentsRemoved = commentService.remove(commentLambdaQueryWrapper);
-                ThrowUtils.throwIf(!commentsRemoved, ErrorCode.OPERATION_ERROR, "图片评论记录删除失败");
+                long commentCount = commentService.count(commentLambdaQueryWrapper);
+                if (commentCount > 0) {
+                    boolean commentsRemoved = commentService.remove(commentLambdaQueryWrapper);
+                    ThrowUtils.throwIf(!commentsRemoved, ErrorCode.OPERATION_ERROR, "图片评论记录删除失败");
+                }
                 return true;
             } catch (Exception e) {
                 status.setRollbackOnly(); // 手动回滚事务
