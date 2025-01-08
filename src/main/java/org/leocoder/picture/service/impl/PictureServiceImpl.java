@@ -952,23 +952,82 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     @Override
     public void deleteBatchPicture(DeleteBatchRequest requestParam, HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
-        // 仅管理员可删除
+        // 校验是否为管理员
         if (!userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         // 获取要删除的图片ID列表
         List<Long> ids = requestParam.getIds();
-
-        // 操作数据库：批量删除图片
-        boolean result = removeBatchByIds(ids);
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-
-        // 删除点赞记录（仅删除有点赞记录的图片）
-        long likeCount = likeService.count(new QueryWrapper<Like>().in("picture_id", ids));
-        if (likeCount > 0) {
-            boolean likeRemoved = likeService.remove(new QueryWrapper<Like>().in("picture_id", ids));
-            ThrowUtils.throwIf(!likeRemoved, ErrorCode.OPERATION_ERROR);
+        if (CollUtil.isEmpty(ids)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "图片ID列表不能为空");
         }
+
+        // 使用事务处理批量删除操作
+        boolean transactionResult = Boolean.TRUE.equals(transactionTemplate.execute(status -> {
+            try {
+                // 查询所有要删除的图片
+                List<Picture> pictures = this.listByIds(ids);
+                if (CollUtil.isEmpty(pictures)) {
+                    throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "部分图片不存在");
+                }
+
+                // 校验权限：仅允许删除有权限的图片
+                for (Picture picture : pictures) {
+                    checkPictureAuth(loginUser, picture);
+                }
+
+                // 批量删除图片
+                boolean result = this.removeByIds(ids);
+                ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "图片批量删除失败");
+
+                // 释放空间额度
+                Map<Long, List<Picture>> spacePicturesMap = pictures.stream()
+                        .filter(picture -> ObjectUtil.isNotNull(picture.getSpaceId()))
+                        .collect(Collectors.groupingBy(Picture::getSpaceId));
+                for (Map.Entry<Long, List<Picture>> entry : spacePicturesMap.entrySet()) {
+                    Long spaceId = entry.getKey();
+                    List<Picture> spacePictures = entry.getValue();
+                    long totalSize = spacePictures.stream().mapToLong(Picture::getPicSize).sum();
+                    int totalCount = spacePictures.size();
+                    boolean updated = spaceService.lambdaUpdate()
+                            .eq(Space::getId, spaceId)
+                            .setSql("total_size = total_size - " + totalSize)
+                            .setSql("total_count = total_count - " + totalCount)
+                            .update();
+                    ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "空间额度更新失败");
+                }
+
+                // 删除点赞记录
+                long likeCount = likeService.count(new QueryWrapper<Like>().in("picture_id", ids));
+                if (likeCount > 0) {
+                    boolean likeRemoved = likeService.remove(new QueryWrapper<Like>().in("picture_id", ids));
+                    ThrowUtils.throwIf(!likeRemoved, ErrorCode.OPERATION_ERROR, "删除点赞记录失败");
+                }
+
+                // 删除收藏记录
+                long favoriteCount = favoriteService.count(new QueryWrapper<Favorite>().in("picture_id", ids));
+                if (favoriteCount > 0) {
+                    boolean favoriteRemoved = favoriteService.remove(new QueryWrapper<Favorite>().in("picture_id", ids));
+                    ThrowUtils.throwIf(!favoriteRemoved, ErrorCode.OPERATION_ERROR, "删除收藏记录失败");
+                }
+
+                // 删除评论记录
+                long commentCount = commentService.count(new QueryWrapper<Comment>().in("picture_id", ids));
+                if (commentCount > 0) {
+                    boolean commentsRemoved = commentService.remove(new QueryWrapper<Comment>().in("picture_id", ids));
+                    ThrowUtils.throwIf(!commentsRemoved, ErrorCode.OPERATION_ERROR, "删除评论记录失败");
+                }
+
+                return true;
+            } catch (Exception e) {
+                status.setRollbackOnly(); // 回滚事务
+                log.error("批量删除图片事务失败，图片ID列表: {}", ids, e);
+                return false;
+            }
+        }));
+
+        // 判断事务结果
+        ThrowUtils.throwIf(!transactionResult, ErrorCode.OPERATION_ERROR, "批量删除图片事务失败");
     }
 
 
