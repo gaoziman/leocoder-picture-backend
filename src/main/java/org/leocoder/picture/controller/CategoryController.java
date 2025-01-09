@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /**
  * @author : 程序员Leo
  * @version 1.0
@@ -38,9 +40,9 @@ public class CategoryController {
 
     private final CategoryService categoryService;
 
-    @PostMapping("get/list")
+    @PostMapping("get/page/list")
     @ApiOperation(value = "分页获取分类列表")
-    public Result<Page<Category>> listCategory(@RequestBody CategoryRequest requestParam) {
+    public Result<Page<Category>> listCategoryByPage(@RequestBody CategoryRequest requestParam) {
         long pageNum = requestParam.getPageNum();
         long pageSize = requestParam.getPageSize();
         // 限制爬虫
@@ -49,6 +51,12 @@ public class CategoryController {
         Page<Category> categoryPage = categoryService.page(new Page<>(pageNum, pageSize),
                 categoryService.getLambdaQueryWrapper(requestParam));
         return ResultUtils.success(categoryPage);
+    }
+
+    @PostMapping("get/list")
+    @ApiOperation(value = "获取分类列表")
+    public Result<List<Category>> listCategory() {
+        return ResultUtils.success(categoryService.list());
     }
 
     @PostMapping("/add")

@@ -1,3 +1,4 @@
+/*
 package org.leocoder.picture.scheduled;
 
 import cn.hutool.core.util.ObjectUtil;
@@ -13,12 +14,14 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Set;
 
+*/
 /**
  * @author : 程序员Leo
  * @version 1.0
  * @date 2024-12-25 09:58
  * @description : 定时任务 - 同步图片浏览数据
- */
+ *//*
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -29,9 +32,11 @@ public class PictureScheduledTask {
     private final PictureService pictureService;
 
 
-    /**
+    */
+/**
      * 定时任务：将 Redis 中的浏览数据同步到数据库
-     */
+     *//*
+
     @Scheduled(initialDelay = 0, fixedRate = 60000) // 任务在项目启动后立即执行一次。每隔 60s 执行一次。
     public void syncViewCountToDatabase() {
         // 获取所有以 "picture:view_count:" 开头的键
@@ -55,9 +60,11 @@ public class PictureScheduledTask {
     }
 
 
-    /**
+    */
+/**同步图片浏览数据到数据库完成
      * 定时任务：恢复 Redis 中的浏览数据
-     */
+     *//*
+
     @Scheduled(cron = "0 0/5 * * * ?") // 每5分钟执行一次
     public void recoverViewCount() {
         // 获取所有图片ID
@@ -82,3 +89,4 @@ public class PictureScheduledTask {
         }
     }
 }
+*/
