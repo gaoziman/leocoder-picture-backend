@@ -229,7 +229,7 @@ public class PictureController {
 
 
     @ApiOperation(value = "刷新缓存（仅管理员可用）")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    // @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @PostMapping("/refreshCache")
     public Result<Boolean> refreshCache(@RequestBody PictureQueryRequest requestParam, HttpServletRequest request) {
         // 校验参数

@@ -16,12 +16,12 @@ spring:
   # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://leocoder.cn:3306/lg_picture?useUnicode=true&useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://myserver.coder:3306/leocoder_picture?useUnicode=true&useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: gzm2001..
   redis:
     database: 9 # Redis 数据库索引（默认为 0）
-    host: 127.0.0.1 # Redis 服务器地址 127.0.0.1
+    host: myserver.coder # Redis 服务器地址 127.0.0.1
     port: 6379 # Redis 服务器连接端口
     password:   # Redis 服务器连接密码（默认为空）
     timeout: 5s # 读超时时间
