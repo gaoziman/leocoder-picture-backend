@@ -281,6 +281,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         Integer reviewStatus = requestParam.getReviewStatus();
         Long spaceId = requestParam.getSpaceId();
         boolean nullSpaceId = requestParam.isNullSpaceId();
+        LocalDateTime endEditTime = requestParam.getEndEditTime();
+        LocalDateTime startEditTime = requestParam.getStartEditTime();
 
         LambdaQueryWrapper<Picture> lambdaQueryWrapper = Wrappers.lambdaQuery(Picture.class);
 
@@ -309,6 +311,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         lambdaQueryWrapper.eq(ObjUtil.isNotEmpty(reviewStatus), Picture::getReviewStatus, reviewStatus);
         lambdaQueryWrapper.eq(ObjUtil.isNotEmpty(spaceId), Picture::getSpaceId, spaceId);
         lambdaQueryWrapper.isNull(nullSpaceId, Picture::getSpaceId);
+        lambdaQueryWrapper.ge(ObjUtil.isNotEmpty(startEditTime), Picture::getCreateTime, startEditTime);
+        lambdaQueryWrapper.lt(ObjUtil.isNotEmpty(endEditTime), Picture::getCreateTime, endEditTime);
 
         // 排序 - 按照创建时间降序
         // 排序处理
