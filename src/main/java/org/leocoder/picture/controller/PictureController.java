@@ -152,7 +152,7 @@ public class PictureController {
         ThrowUtils.throwIf(ObjectUtil.isNull(pictureId) || pictureId <= 0, ErrorCode.PARAMS_ERROR);
         Picture oldPicture = pictureService.getById(pictureId);
         ThrowUtils.throwIf(ObjectUtil.isNull(oldPicture), ErrorCode.NOT_FOUND_ERROR);
-        List<ImageSearchResult> resultList = ImageSearchApiFacade.searchImage(oldPicture.getUrl());
+        List<ImageSearchResult> resultList = ImageSearchApiFacade.searchImage(oldPicture.getName());
         return ResultUtils.success(resultList);
     }
 
