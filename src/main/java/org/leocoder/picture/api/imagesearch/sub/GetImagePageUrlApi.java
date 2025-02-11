@@ -26,8 +26,8 @@ public class GetImagePageUrlApi {
     /**
      * 获取以图搜图页面地址
      *
-     * @param imageUrl
-     * @return
+     * @param imageUrl 图片 URL
+     * @return 以图搜图页面地址
      */
     public static String getImagePageUrl(String imageUrl) {
         // image: https%3A%2F%2Fwww.codefather.cn%2Flogo.png

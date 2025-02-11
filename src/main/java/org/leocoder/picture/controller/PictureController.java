@@ -141,9 +141,6 @@ public class PictureController {
     }
 
 
-    /**
-     * 以图搜图
-     */
     @ApiOperation(value = "以图搜图")
     @PostMapping("/search/picture")
     public Result<List<ImageSearchResult>> searchPictureByPicture(@RequestBody SearchPictureByPictureRequest requestParam) {

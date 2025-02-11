@@ -61,7 +61,8 @@ public class GetImageListApi {
 
     public static void main(String[] args) {
         // 示例：通过中文关键词获取图片列表
-        String query = "自然";  // 中文关键词
+        // 中文关键词
+        String query = "自然";
         List<ImageSearchResult> imageList = getImageList(query);
         System.out.println("搜索成功，获取到图片列表：" + imageList);
     }
