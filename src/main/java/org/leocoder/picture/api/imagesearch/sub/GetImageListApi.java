@@ -20,14 +20,17 @@ public class GetImageListApi {
     /**
      * 获取图片列表
      *
-     * @param query 搜索关键词
+     * @param query 搜索关键词（中文）
      * @return 图片搜索结果列表
      */
     public static List<ImageSearchResult> getImageList(String query) {
         try {
-            // 使用 Pexels API 搜索图片
+            // 先将中文关键词翻译为英文
             PexelsImageSearch imageSearch = new PexelsImageSearch();
-            List<String> imageUrls = imageSearch.searchPictures(query);
+            String translatedQuery = imageSearch.translateChineseToEnglish(query);
+
+            // 使用 Pexels API 搜索图片
+            List<String> imageUrls = imageSearch.searchPictures(translatedQuery, 30);
 
             // 将图片的URL转为ImageSearchResult对象
             return convertToImageSearchResults(imageUrls);
@@ -57,8 +60,8 @@ public class GetImageListApi {
     }
 
     public static void main(String[] args) {
-        // 示例：通过 Pexels API 获取与“nature”相关的图片列表
-        String query = "nature";
+        // 示例：通过中文关键词获取图片列表
+        String query = "自然";  // 中文关键词
         List<ImageSearchResult> imageList = getImageList(query);
         System.out.println("搜索成功，获取到图片列表：" + imageList);
     }
