@@ -10,6 +10,7 @@ import org.leocoder.picture.domain.dto.picture.*;
 import org.leocoder.picture.domain.vo.picture.PictureVO;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * @author : 程序员Leo
@@ -56,6 +57,16 @@ public interface PictureService extends IService<Picture> {
      */
     PictureVO getPictureVO(Picture picture, HttpServletRequest request);
 
+
+    /**
+     * 根据颜色搜索图片
+     *
+     * @param spaceId   空间id
+     * @param picColor  颜色
+     * @param loginUser 登录用户
+     * @return 图片信息封装类
+     */
+    List<PictureVO> searchPictureByColor(Long spaceId, String picColor, User loginUser);
 
     /**
      * 分页获取图片信息封装类

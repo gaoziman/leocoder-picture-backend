@@ -163,6 +163,12 @@ public class Picture implements Serializable {
     @TableField(value = "space_id")
     private Long spaceId;
 
+    /**
+     * 图片主色调
+     */
+    @TableField(value = "pic_color")
+    private String picColor;
+
 
     /**
      * 是否删除

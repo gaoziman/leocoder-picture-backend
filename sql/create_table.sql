@@ -85,6 +85,10 @@ ALTER TABLE picture
 ALTER TABLE picture
     ADD COLUMN space_id  bigint  null comment '空间 id（为空表示公共空间）';
 
+ALTER TABLE picture
+    ADD COLUMN pic_color varchar(16) null comment '图片主色调';
+
+
 -- 创建索引
 CREATE INDEX idx_spaceId ON picture (space_id);
 

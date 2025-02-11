@@ -8,6 +8,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.leocoder.picture.annotation.AuthCheck;
+import org.leocoder.picture.api.imagesearch.ImageSearchApiFacade;
+import org.leocoder.picture.api.imagesearch.model.ImageSearchResult;
 import org.leocoder.picture.common.DeleteRequest;
 import org.leocoder.picture.common.Result;
 import org.leocoder.picture.common.ResultUtils;
@@ -30,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -135,6 +138,34 @@ public class PictureController {
 
         // 获取封装类
         return ResultUtils.success(pictureService.getPictureVOPage(picturePage, request));
+    }
+
+
+    /**
+     * 以图搜图
+     */
+    @ApiOperation(value = "以图搜图")
+    @PostMapping("/search/picture")
+    public Result<List<ImageSearchResult>> searchPictureByPicture(@RequestBody SearchPictureByPictureRequest requestParam) {
+        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
+        Long pictureId = requestParam.getPictureId();
+        ThrowUtils.throwIf(ObjectUtil.isNull(pictureId) || pictureId <= 0, ErrorCode.PARAMS_ERROR);
+        Picture oldPicture = pictureService.getById(pictureId);
+        ThrowUtils.throwIf(ObjectUtil.isNull(oldPicture), ErrorCode.NOT_FOUND_ERROR);
+        List<ImageSearchResult> resultList = ImageSearchApiFacade.searchImage(oldPicture.getUrl());
+        return ResultUtils.success(resultList);
+    }
+
+
+    @ApiOperation("通过颜色搜索图片")
+    @PostMapping("/search/color")
+    public Result<List<PictureVO>> searchPictureByColor(@RequestBody SearchPictureByColorRequest requestParam, HttpServletRequest request) {
+        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
+        String picColor = requestParam.getPicColor();
+        Long spaceId = requestParam.getSpaceId();
+        User loginUser = userService.getLoginUser(request);
+        List<PictureVO> result = pictureService.searchPictureByColor(spaceId, picColor, loginUser);
+        return ResultUtils.success(result);
     }
 
 
