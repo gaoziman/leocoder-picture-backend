@@ -8,6 +8,7 @@ import org.leocoder.picture.domain.Picture;
 import org.leocoder.picture.domain.User;
 import org.leocoder.picture.domain.dto.picture.*;
 import org.leocoder.picture.domain.vo.picture.PictureVO;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -189,4 +190,14 @@ public interface PictureService extends IService<Picture> {
      * @param request      请求对象
      */
     void updatePicture(PictureUpdateRequest requestParam, HttpServletRequest request);
+
+
+    /**
+     * 批量编辑图片信息（管理员使用）
+     *
+     * @param requestParam 图片批量编辑请求参数
+     * @param loginUser    登录用户
+     */
+    @Transactional(rollbackFor = Exception.class)
+    void editPictureByBatch(PictureEditByBatchRequest requestParam, User loginUser);
 }

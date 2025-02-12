@@ -400,4 +400,16 @@ public class PictureController {
         result.put("nextId", prevId);
         return ResultUtils.success(result);
     }
+
+
+    @ApiOperation(value = "批量编辑图片")
+    @PostMapping("/edit/batch")
+    public Result<Boolean> editPictureByBatch(@RequestBody PictureEditByBatchRequest requestParam,
+                                              HttpServletRequest request) {
+        ThrowUtils.throwIf(ObjectUtil.isNull(requestParam), ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        pictureService.editPictureByBatch(requestParam, loginUser);
+        return ResultUtils.success(true);
+    }
+
 }
