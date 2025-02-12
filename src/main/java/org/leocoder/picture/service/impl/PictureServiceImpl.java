@@ -1248,7 +1248,15 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
         long count = 1;
         try {
             for (Picture picture : pictureList) {
-                String pictureName = nameRule.replaceAll("\\{序号}", String.valueOf(count++));
+                String pictureName = nameRule;
+
+                // 替换 {序号}
+                pictureName = pictureName.replaceAll("\\{序号}", String.valueOf(count++));
+
+                // 替换其他动态变量，如图片名称和上传时间
+                pictureName = pictureName.replaceAll("\\{图片名称}", picture.getName());
+                pictureName = pictureName.replaceAll("\\{上传时间}", LocalDateTime.now().toString());
+
                 picture.setName(pictureName);
             }
         } catch (Exception e) {
