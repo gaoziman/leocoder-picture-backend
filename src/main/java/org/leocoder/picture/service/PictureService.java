@@ -3,6 +3,7 @@ package org.leocoder.picture.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.leocoder.picture.api.aliyunai.CreateOutPaintingTaskResponse;
 import org.leocoder.picture.common.DeleteRequest;
 import org.leocoder.picture.domain.Picture;
 import org.leocoder.picture.domain.User;
@@ -200,4 +201,6 @@ public interface PictureService extends IService<Picture> {
      */
     @Transactional(rollbackFor = Exception.class)
     void editPictureByBatch(PictureEditByBatchRequest requestParam, User loginUser);
+
+    CreateOutPaintingTaskResponse createPictureOutPaintingTask(CreatePictureOutPaintingTaskRequest createPictureOutPaintingTaskRequest, User loginUser);
 }

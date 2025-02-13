@@ -1,5 +1,6 @@
 package org.leocoder.picture.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.ObjectUtil;
@@ -20,6 +21,9 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.leocoder.picture.api.aliyunai.AliYunAiApi;
+import org.leocoder.picture.api.aliyunai.CreateOutPaintingTaskRequest;
+import org.leocoder.picture.api.aliyunai.CreateOutPaintingTaskResponse;
 import org.leocoder.picture.common.DeleteRequest;
 import org.leocoder.picture.domain.*;
 import org.leocoder.picture.domain.dto.file.UploadPictureResult;
@@ -92,6 +96,8 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
     private final TransactionTemplate transactionTemplate;
 
     private final CommentService commentService;
+
+    private final AliYunAiApi aliYunAiApi;
 
 
     /**
@@ -1236,6 +1242,32 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
 
     /**
+     * 创建图片外发任务
+     *
+     * @param requestParam 图片外发任务请求参数
+     * @param loginUser                           登录用户
+     * @return 创建外发任务响应
+     */
+    @Override
+    public CreateOutPaintingTaskResponse createPictureOutPaintingTask(CreatePictureOutPaintingTaskRequest requestParam, User loginUser) {
+        // 获取图片信息
+        Long pictureId = requestParam.getPictureId();
+        Picture picture = Optional.ofNullable(this.getById(pictureId))
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ERROR));
+        // 权限校验
+        checkPictureAuth(loginUser, picture);
+        // 构造请求参数
+        CreateOutPaintingTaskRequest taskRequest = new CreateOutPaintingTaskRequest();
+        CreateOutPaintingTaskRequest.Input input = new CreateOutPaintingTaskRequest.Input();
+        input.setImageUrl(picture.getUrl());
+        taskRequest.setInput(input);
+        BeanUtil.copyProperties(requestParam, taskRequest);
+        // 创建任务
+        return aliYunAiApi.createOutPaintingTask(taskRequest);
+    }
+
+
+    /**
      * nameRule 格式：图片{序号}
      *
      * @param pictureList 图片列表
@@ -1264,6 +1296,4 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "名称解析错误");
         }
     }
-
-
 }

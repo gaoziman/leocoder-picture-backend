@@ -1,6 +1,7 @@
 package org.leocoder.picture.controller;
 
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -8,6 +9,9 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.leocoder.picture.annotation.AuthCheck;
+import org.leocoder.picture.api.aliyunai.AliYunAiApi;
+import org.leocoder.picture.api.aliyunai.CreateOutPaintingTaskResponse;
+import org.leocoder.picture.api.aliyunai.GetOutPaintingTaskResponse;
 import org.leocoder.picture.api.imagesearch.ImageSearchApiFacade;
 import org.leocoder.picture.api.imagesearch.model.ImageSearchResult;
 import org.leocoder.picture.common.DeleteRequest;
@@ -53,6 +57,7 @@ public class PictureController {
 
     private final SpaceService spaceService;
 
+    private final AliYunAiApi aliYunAiApi;
 
     @ApiOperation(value = "上传图片（可重新上传）")
     @PostMapping("/upload")
@@ -412,4 +417,26 @@ public class PictureController {
         return ResultUtils.success(true);
     }
 
+
+    @ApiOperation(value = "创建 AI 扩图任务")
+    @PostMapping("/out_painting/create_task")
+    public Result<CreateOutPaintingTaskResponse> createPictureOutPaintingTask(
+            @RequestBody CreatePictureOutPaintingTaskRequest requestParam,
+            HttpServletRequest request) {
+        if (ObjectUtil.isNull(requestParam) || ObjectUtil.isNull(requestParam.getPictureId())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        CreateOutPaintingTaskResponse response = pictureService.createPictureOutPaintingTask(requestParam, loginUser);
+        return ResultUtils.success(response);
+    }
+
+
+    @ApiOperation(value = "查询 AI 扩图任务")
+    @GetMapping("/out_painting/get_task")
+    public Result<GetOutPaintingTaskResponse> getPictureOutPaintingTask(String taskId) {
+        ThrowUtils.throwIf(StrUtil.isBlank(taskId), ErrorCode.PARAMS_ERROR);
+        GetOutPaintingTaskResponse task = aliYunAiApi.getOutPaintingTask(taskId);
+        return ResultUtils.success(task);
+    }
 }
