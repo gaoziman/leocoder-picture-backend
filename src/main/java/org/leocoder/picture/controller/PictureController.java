@@ -59,6 +59,8 @@ public class PictureController {
 
     private final AliYunAiApi aliYunAiApi;
 
+    private final ImageSearchApiFacade imageSearchApiFacade;
+
     @ApiOperation(value = "上传图片（可重新上传）")
     @PostMapping("/upload")
     // @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
@@ -154,7 +156,8 @@ public class PictureController {
         ThrowUtils.throwIf(ObjectUtil.isNull(pictureId) || pictureId <= 0, ErrorCode.PARAMS_ERROR);
         Picture oldPicture = pictureService.getById(pictureId);
         ThrowUtils.throwIf(ObjectUtil.isNull(oldPicture), ErrorCode.NOT_FOUND_ERROR);
-        List<ImageSearchResult> resultList = ImageSearchApiFacade.searchImage(oldPicture.getName());
+        // 使用Pexels API进行图片搜索
+        List<ImageSearchResult> resultList = imageSearchApiFacade.searchImage(oldPicture.getName());
         return ResultUtils.success(resultList);
     }
 

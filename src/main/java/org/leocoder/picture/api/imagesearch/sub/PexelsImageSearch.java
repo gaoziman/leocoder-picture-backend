@@ -9,6 +9,8 @@ import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -21,16 +23,22 @@ import java.util.List;
  * @description : 使用 Pexels API 进行图片搜索，不指定页面和每页数量
  */
 @Slf4j
+@Component
 public class PexelsImageSearch {
 
-    private static final String API_KEY = "XEpGZUQnnzSbx365K0dly3NHhjC42QvvskU4W86l2lEmlSBlpGkxY6lI";
+    @Value("${pexels.apiKey}")
+    private String apiKey;
     private static final String ENDPOINT = "https://api.pexels.com/v1/search";
 
-    private static final String BAIDU_APP_ID = "20230529001693180";
-    private static final String BAIDU_API_KEY = "H0nYZ0MTMhr_yeV47tIl";
+    @Value("${baidu.baiduAppId}")
+    private String baiduAppId;
+
+    @Value("${baidu.baiduApiKey}")
+    private String baiduApiKey;
+
     private static final String BAIDU_TRANSLATE_ENDPOINT = "https://fanyi-api.baidu.com/api/trans/vip/translate";
 
-    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int DEFAULT_PAGE_SIZE = 12;
 
     /**
      * 使用百度翻译将中文转为英文
@@ -42,11 +50,11 @@ public class PexelsImageSearch {
         try {
             // 构建百度翻译请求参数
             String salt = String.valueOf(System.currentTimeMillis());
-            String sign = BAIDU_APP_ID + query + salt + BAIDU_API_KEY;
+            String sign = baiduAppId + query + salt + baiduApiKey;
             String signMd5 = Md5Utils.md5Hex(sign);
 
             String url = BAIDU_TRANSLATE_ENDPOINT + "?q=" + query
-                    + "&from=zh&to=en&appid=" + BAIDU_APP_ID + "&salt=" + salt + "&sign=" + signMd5;
+                    + "&from=zh&to=en&appid=" + baiduAppId + "&salt=" + salt + "&sign=" + signMd5;
 
             // 发起HTTP请求
             HttpResponse response = HttpRequest.get(url).execute();
@@ -87,7 +95,7 @@ public class PexelsImageSearch {
                 OkHttpClient client = new OkHttpClient();
                 Request request = new Request.Builder()
                         .url(apiUrl)
-                        .addHeader("Authorization", API_KEY)
+                        .addHeader("Authorization", apiKey)
                         .build();
                 Response response = client.newCall(request).execute();
 
@@ -130,7 +138,7 @@ public class PexelsImageSearch {
     /**
      * 主方法：搜索中文关键词，翻译为英文并搜索图片
      */
-    public List<String> searchPicturesForChinese(String query, int totalCount) {
+    public  List<String> searchPicturesForChinese(String query, int totalCount) {
         String translatedQuery = translateChineseToEnglish(query);
         return searchPictures(translatedQuery, totalCount);
     }
@@ -138,7 +146,7 @@ public class PexelsImageSearch {
     public static void main(String[] args) {
         // 测试：使用中文搜索并进行翻译，获取 30 张图片
         PexelsImageSearch imageSearch = new PexelsImageSearch();
-        List<String> imageUrls = imageSearch.searchPicturesForChinese("狗", 30);
+        List<String> imageUrls = imageSearch.searchPicturesForChinese("狗", 18);
         System.out.println("搜索到的图片URLs: ");
         imageUrls.forEach(System.out::println);
     }
